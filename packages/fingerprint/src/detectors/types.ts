@@ -2,7 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Signal, SignalKind, ProductFormId } from '../types';
+import type { Signal, ProductFormId } from '../types';
 import { FORM_DIR_RULES, slugify } from '../language-map';
 import { isNoiseDir, isRecord } from '../fs-utils';
 import {
@@ -16,24 +16,15 @@ import {
   extractGemfileDeps,
 } from './dep-parsers';
 
-/** makeSignal 参数对象 */
-export interface MakeSignalParams {
-  /** 信号种类 */
-  readonly kind: SignalKind;
-  /** 规则 ID */
-  readonly ruleId: string;
-  /** 关联文件相对路径 */
-  readonly file: string;
-  /** 信号权重 */
-  readonly weight: number;
-  /** 信号载荷 */
-  readonly payload: unknown;
-}
-
-/** 构造信号（ruleId/kind/file/weight/payload；weight = 产出探测器的权重）。 */
-export function makeSignal(params: MakeSignalParams): Signal {
-  const { kind, ruleId, file, weight, payload } = params;
-  return { ruleId, kind, file, weight, payload };
+/**
+ * 构造信号（ruleId/kind/file/weight/payload；weight = 产出探测器的权重）。
+ *
+ * 参数即信号本体：此前另立了同形参数类型 `MakeSignalParams`，与 {@link Signal}
+ * 的 5 个字段逐一重复且注释各写一份 —— `Signal` 加字段时它不会跟随，等于给
+ * 信号形状开了第二个定义点。现直接用 `Signal` 约束入参。
+ */
+export function makeSignal(signal: Signal): Signal {
+  return signal;
 }
 
 /**

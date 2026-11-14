@@ -175,19 +175,29 @@ export function computeDiffCoverage(
   };
 }
 
+/**
+ * 读取文本文件；不存在/不可读时返回 undefined。
+ *
+ * 候选报告文件「缺一个就试下一个」的语义在门禁里出现两次（本文件的 diff 覆盖率、
+ * `gate-metrics` 的全量覆盖率），此前各写一遍 try/catch 读文件样板。收敛后
+ * 两处的失败口径一致：读不到 ≠ 报错，只是这个来源不可用。
+ */
+export function readTextIfExists(filePath: string): string | undefined {
+  try {
+    return fs.readFileSync(filePath, 'utf-8');
+  } catch {
+    return undefined;
+  }
+}
+
 /** 读取覆盖率报告的行级数据；都没有返回 undefined */
 export function readLineCoverage(
   repoRoot: string,
   candidates: readonly string[] = DEFAULT_DIFF_COVERAGE_REPORTS,
 ): LineCoverage | undefined {
   for (const rel of candidates) {
-    const full = path.resolve(repoRoot, rel);
-    let raw: string;
-    try {
-      raw = fs.readFileSync(full, 'utf-8');
-    } catch {
-      continue;
-    }
+    const raw = readTextIfExists(path.resolve(repoRoot, rel));
+    if (raw === undefined) continue;
     const parsed = rel.endsWith('.json')
       ? parseCoverageFinal(raw, repoRoot)
       : parseLcov(raw, repoRoot);

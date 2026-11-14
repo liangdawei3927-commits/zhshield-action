@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { readGateDeclaration } from '@zh/kernel';
@@ -8,6 +7,7 @@ import {
   computeDiffCoverage,
   readChangedLines,
   readLineCoverage,
+  readTextIfExists,
   resolveCoverageBase,
 } from './gate-coverage-diff';
 
@@ -168,13 +168,8 @@ export function readProjectCoveragePct(
   candidates: readonly string[] = DEFAULT_COVERAGE_REPORTS,
 ): number | undefined {
   for (const rel of candidates) {
-    const full = path.resolve(repoRoot, rel);
-    let raw: string;
-    try {
-      raw = fs.readFileSync(full, 'utf-8');
-    } catch {
-      continue;
-    }
+    const raw = readTextIfExists(path.resolve(repoRoot, rel));
+    if (raw === undefined) continue;
     try {
       const parsed = JSON.parse(raw) as { total?: { lines?: { pct?: unknown } } };
       const pct = parsed.total?.lines?.pct;

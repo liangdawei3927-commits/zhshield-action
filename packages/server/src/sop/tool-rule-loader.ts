@@ -23,12 +23,25 @@ export interface ToolRuleFileEntry {
 /**
  * 从 tool-packs 目录加载工具规则文件
  * 支持 semgrep、trivy、eslint、dep-cruiser 等工具的规则包
+ *
+ * ⚠️ 默认目录自 2026-09-05（`a004661`「C6 删源规则」）起**已不存在**：
+ * `packages/kernel/src/sop/tool-packs` 的 94 个规则文件已迁到
+ * `packages/kernel/test-fixtures/sop-content/tool-packs`（测试夹具，不是生产来源）。
+ *
+ * 因此本 loader 的「默认路径」在生产里必然落空，`loadAll()` 返回空——这是**预期行为**，
+ * 不是故障：规则的正规来源是数据库（`tool_package` 表），由 `ToolRuleStore.snapshot()`
+ * 从 `SopContentRepository` 读取。文件系统只是 DB 不可用时的兜底，而该兜底当前没有
+ * 内容可读（`tool-rule-store` 会打一条 warn 后降级为空包）。
+ *
+ * 不要把默认路径改指 test-fixtures：测试数据不该成为生产兜底来源。
+ * 需要恢复文件系统兜底时，应把规则包重新放回一个**生产**目录，再同步改默认路径。
  */
 export class ToolRuleLoader {
   private packsDir: string;
 
   constructor(packsDir?: string) {
     // 默认指向 packages/kernel/src/sop/tool-packs（从 <server>/{src,dist}/sop 上溯三级到 packages/）
+    // ⚠️ 该目录已删除（见类注释），此默认值在生产中必然落空 → 空包降级
     this.packsDir =
       packsDir ?? join(__dirname, '..', '..', '..', 'kernel', 'src', 'sop', 'tool-packs');
   }

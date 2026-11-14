@@ -106,8 +106,10 @@ packages/kernel/src/sop/        packages/server/src/sop/      packages/server/sr
                                              （桌面端客户端：比对 version → 下载 → 哈希校验落盘）
 ```
 
-- **第 1 层 · 规则包源文件**：`packages/kernel/src/sop/tool-packs/<tool>/` 下按工具分目录存放 YAML（如 `semgrep/rules/backdoor.yaml`、`trivy/policy/ignore.yml`）。这是规则的唯一事实来源。
+- **第 1 层 · 规则包源文件**：`packages/kernel/src/sop/tool-packs/<tool>/` 下按工具分目录存放 YAML（如 `semgrep/rules/backdoor.yaml`、`trivy/policy/ignore.yml`）。
+  ⚠️ **该目录自 2026-09-05（`a004661`「C6 删源规则」）起已删除**，94 个规则文件迁至 `packages/kernel/test-fixtures/sop-content/tool-packs`（测试夹具）。规则的正规来源现在是**数据库**（`tool_package` 表），由 `ToolRuleStore.snapshot()` 从 `SopContentRepository` 读取。
 - **第 2 层 · ToolRuleLoader**：`packages/server/src/sop/tool-rule-loader.ts` 扫描 tool-packs 目录，输出与同步契约一致的 `{ filename, content }[]`（filename 为工具目录下的 POSIX 相对路径）。目录缺失或单个文件不可读时优雅降级（跳过 / 返回空）。
+  ⚠️ 由于第 1 层目录已删除，默认路径在生产中**必然落空、返回空包**——这是预期行为（DB 为正规来源），不是故障。显式传入 `packsDir` 的调用（如测试）不受影响。
 - **第 3 层 · ToolRuleController**：`packages/server/src/sop/tool-rule.controller.ts` 构造时通过 loader 一次性快照各工具的规则包，对外提供：
   - `GET /rules/:tool/version` — `{ toolId, version, hash, size, publishedAt }`；`hash` 为 `hashToolRuleFiles(payload)`，`version = 1.<hash 前 12 位>` 由内容派生，**规则文件一改，version 自动变化**，桌面端才会触发增量同步；
   - `GET /rules/:tool/download` — 规则文件数组（JSON），客户端写盘后按同一哈希算法校验；

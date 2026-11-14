@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: a688bf44122a6f2b
+// @zh-src-hash: 5f726e9e356bf6ca
 // @zh-src-files: 434
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -501018,11 +501018,10 @@ function hasLocalVulnerabilityDb() {
     return false;
   }
 }
-var import_node_crypto20, fs53, os12, path56, DB_UNAVAILABLE_MARKERS, META12, ARG_BUILDERS, TrivyAdapter2;
+var fs53, os12, path56, DB_UNAVAILABLE_MARKERS, META12, ARG_BUILDERS, TrivyAdapter2;
 var init_trivy_adapter = __esm({
   "../security/src/adapters/trivy-adapter.ts"() {
     "use strict";
-    import_node_crypto20 = require("node:crypto");
     fs53 = __toESM(require("node:fs"));
     os12 = __toESM(require("node:os"));
     path56 = __toESM(require("node:path"));
@@ -501193,55 +501192,18 @@ var init_trivy_adapter = __esm({
         const build = ARG_BUILDERS[scanType];
         return build ? build(projectPath, options2) : null;
       }
+      /**
+       * 映射交给 `@zh/shared` 的 `trivyMapper`。
+       *
+       * 这段「trivy 输出 → Issue」的映射曾在本包与 `@zh/shared/output-mappers` 各写一份
+       * （2026-11-15 核实为逐字段等价：severity 三级折算、suggestion 仅在有 FixedVersion 时给、
+       * fingerprint 口径 `trivy:<id>:<target>:<pkg>` 全同）。两份同时存在时，改一处忘另一处
+       * **不会报错**——只会让同一份 trivy 扫描结果在 CLI/桌面两条链上产出不同的
+       * fingerprint，进而让豁免/白名单命中不一致。安全域的 semgrep 适配器已采用同一做法
+       * （复用 `semgrepMapper`），这里只是补齐。
+       */
       mapOutput(output) {
-        if (!output?.Results || !Array.isArray(output.Results)) return [];
-        const issues = [];
-        for (const result of output.Results) {
-          issues.push(...this.mapResultVulnerabilities(result));
-          issues.push(...this.mapResultSecrets(result));
-        }
-        return issues;
-      }
-      mapResultVulnerabilities(result) {
-        if (!Array.isArray(result.Vulnerabilities)) return [];
-        return result.Vulnerabilities.map((vuln) => this.mapVulnerability(vuln, result.Target || ""));
-      }
-      mapVulnerability(vuln, target) {
-        const sev = (vuln.Severity || "").toUpperCase();
-        return {
-          id: (0, import_node_crypto20.randomUUID)(),
-          ruleId: vuln.VulnerabilityID || "trivy-unknown",
-          severity: sev === "CRITICAL" || sev === "HIGH" ? "error" : sev === "MEDIUM" ? "warning" : "info",
-          category: "security",
-          message: `${vuln.PkgName || "?"}@${vuln.InstalledVersion || "?"}: ${vuln.Title || vuln.VulnerabilityID || ""}`,
-          file: target,
-          line: 0,
-          column: 0,
-          suggestion: vuln.FixedVersion ? `\u5347\u7EA7\u5230 ${vuln.FixedVersion}` : void 0,
-          autoFixable: !!vuln.FixedVersion,
-          source: "security",
-          fingerprint: `trivy:${vuln.VulnerabilityID || ""}:${target}:${vuln.PkgName || ""}`
-        };
-      }
-      mapResultSecrets(result) {
-        if (!Array.isArray(result.Secrets)) return [];
-        return result.Secrets.map((secret) => this.mapSecret(secret, result.Target || ""));
-      }
-      mapSecret(secret, target) {
-        return {
-          id: (0, import_node_crypto20.randomUUID)(),
-          ruleId: `trivy-secret-${secret.RuleID || "unknown"}`,
-          severity: "error",
-          category: "security",
-          message: secret.Title || `Secret detected: ${secret.RuleID}`,
-          file: secret.File || target,
-          line: secret.StartLine || 0,
-          column: 0,
-          suggestion: "\u79FB\u9664\u786C\u7F16\u7801\u7684\u5BC6\u94A5\uFF0C\u4F7F\u7528\u73AF\u5883\u53D8\u91CF\u6216\u5BC6\u94A5\u7BA1\u7406\u670D\u52A1",
-          autoFixable: false,
-          source: "security",
-          fingerprint: `trivy-secret:${secret.RuleID || ""}:${secret.File || ""}:${secret.StartLine || 0}`
-        };
+        return trivyMapper(output);
       }
     };
   }
@@ -501354,11 +501316,11 @@ var init_grype_adapter = __esm({
 });
 
 // ../security/src/adapters/ort-adapter.ts
-var import_node_crypto21, path58, fs54, ORT_TIMEOUT, RESTRICTED_LICENSES, META14, ORTAdapter;
+var import_node_crypto20, path58, fs54, ORT_TIMEOUT, RESTRICTED_LICENSES, META14, ORTAdapter;
 var init_ort_adapter = __esm({
   "../security/src/adapters/ort-adapter.ts"() {
     "use strict";
-    import_node_crypto21 = require("node:crypto");
+    import_node_crypto20 = require("node:crypto");
     path58 = __toESM(require("node:path"));
     fs54 = __toESM(require("node:fs"));
     init_src2();
@@ -501498,7 +501460,7 @@ var init_ort_adapter = __esm({
         const pkgName = pkg.id || "unknown";
         const restrictedLicenses = licenses.filter((l) => RESTRICTED_LICENSES.has(l));
         return {
-          id: (0, import_node_crypto21.randomUUID)(),
+          id: (0, import_node_crypto20.randomUUID)(),
           ruleId: "ort/restricted-license",
           severity: restrictedLicenses.some((l) => l.startsWith("GPL") || l.startsWith("AGPL")) ? "error" : "warning",
           category: "dependency",
@@ -501878,7 +501840,7 @@ function isRecord3(value) {
   return typeof value === "object" && value !== null;
 }
 function toFinding(params) {
-  return { id: (0, import_node_crypto22.randomUUID)(), ...params };
+  return { id: (0, import_node_crypto21.randomUUID)(), ...params };
 }
 function extractComments(content, ext) {
   const linePrefix = LINE_COMMENT_PREFIX.get(ext);
@@ -501974,11 +501936,11 @@ function scanMarkdownHiddenLinks(content) {
 function isEnvFile(fileName) {
   return ENV_FILE_NAMES.has(fileName);
 }
-var import_node_crypto22, fs56, path60, MARKDOWN_EXT, ENV_FILE_NAMES, LINE_COMMENT_PREFIX, BLOCK_COMMENT_DELIMS, INSTRUCTION_PATTERNS, SCRIPT_SUSPICIOUS_PATTERNS, SAFE_RM_RF_TARGET, COMMAND_SEGMENT_SPLIT_RE, TOKEN_SPLIT_RE, HIDDEN_STYLE_PATTERN, ANCHOR_TAG_PATTERN, MD_LINK_TARGET_PATTERN, ZERO_WIDTH_PATTERN, InjectionGuard;
+var import_node_crypto21, fs56, path60, MARKDOWN_EXT, ENV_FILE_NAMES, LINE_COMMENT_PREFIX, BLOCK_COMMENT_DELIMS, INSTRUCTION_PATTERNS, SCRIPT_SUSPICIOUS_PATTERNS, SAFE_RM_RF_TARGET, COMMAND_SEGMENT_SPLIT_RE, TOKEN_SPLIT_RE, HIDDEN_STYLE_PATTERN, ANCHOR_TAG_PATTERN, MD_LINK_TARGET_PATTERN, ZERO_WIDTH_PATTERN, InjectionGuard;
 var init_injection_guard = __esm({
   "../security/src/injection-guard.ts"() {
     "use strict";
-    import_node_crypto22 = require("node:crypto");
+    import_node_crypto21 = require("node:crypto");
     fs56 = __toESM(require("node:fs"));
     path60 = __toESM(require("node:path"));
     init_scan_walk();
@@ -502153,7 +502115,7 @@ function mapCrossEntries(report) {
     const first = entry.issues[0];
     if (!first) continue;
     result.push({
-      id: (0, import_node_crypto23.randomUUID)(),
+      id: (0, import_node_crypto22.randomUUID)(),
       cveId: entry.cveId || void 0,
       severity: entry.suggestedSeverity === "error" ? "high" : entry.suggestedSeverity === "warning" ? "medium" : "low",
       title: first.message,
@@ -502173,11 +502135,11 @@ function mapCrossEntries(report) {
   }
   return result;
 }
-var import_node_crypto23, ResultAggregator;
+var import_node_crypto22, ResultAggregator;
 var init_engine_result_aggregator = __esm({
   "../security/src/engine-result-aggregator.ts"() {
     "use strict";
-    import_node_crypto23 = require("node:crypto");
+    import_node_crypto22 = require("node:crypto");
     init_garbage_scanner();
     init_malware_scanner();
     init_injection_guard();
@@ -502447,7 +502409,7 @@ var init_engine2 = __esm({
 
 // ../security/src/secrets/lifecycle-utils.ts
 function hashSecret(value) {
-  return (0, import_node_crypto24.createHash)("sha256").update(value, "utf8").digest("hex");
+  return (0, import_node_crypto23.createHash)("sha256").update(value, "utf8").digest("hex");
 }
 function maskSecret(value) {
   if (value.length <= 8) return "****";
@@ -502485,11 +502447,11 @@ function isPublicRemoteUrl(url) {
   if (!host) return false;
   return PUBLIC_HOSTS.has(host) || Array.from(PUBLIC_HOSTS, (h) => h).some((h) => host.endsWith(`.${h}`));
 }
-var import_node_crypto24, fs57, path62, SCHEME_RE, USER_RE, HOST_SPLIT_RE, EXCLUDED_FILE_PATTERN2, RULE_TO_TYPE, CLOUD_CREDENTIAL_TYPES, PUBLIC_HOSTS, SEVERITY_ORDER2, defaultRunner, FileSecretStore;
+var import_node_crypto23, fs57, path62, SCHEME_RE, USER_RE, HOST_SPLIT_RE, EXCLUDED_FILE_PATTERN2, RULE_TO_TYPE, CLOUD_CREDENTIAL_TYPES, PUBLIC_HOSTS, SEVERITY_ORDER2, defaultRunner, FileSecretStore;
 var init_lifecycle_utils = __esm({
   "../security/src/secrets/lifecycle-utils.ts"() {
     "use strict";
-    import_node_crypto24 = require("node:crypto");
+    import_node_crypto23 = require("node:crypto");
     fs57 = __toESM(require("node:fs"));
     path62 = __toESM(require("node:path"));
     init_src2();
@@ -505811,7 +505773,7 @@ function moveToTrash(params) {
   const { item, type, absPath, root, state: state2 } = params;
   try {
     if (!state2.batchId) {
-      const newBatchId = (0, import_node_crypto25.randomUUID)();
+      const newBatchId = (0, import_node_crypto24.randomUUID)();
       const newTrashDir = safeJoinReal(root, ".zhshield", "trash", newBatchId);
       fs68.mkdirSync(newTrashDir, { recursive: true });
       state2.batchId = newBatchId;
@@ -505894,11 +505856,11 @@ function resolveDestPath(root, rel, failed2) {
     return null;
   }
 }
-var import_node_crypto25, fs68, path72;
+var import_node_crypto24, fs68, path72;
 var init_cleaner = __esm({
   "../garbage/src/cleaner.ts"() {
     "use strict";
-    import_node_crypto25 = require("node:crypto");
+    import_node_crypto24 = require("node:crypto");
     fs68 = __toESM(require("node:fs"));
     path72 = __toESM(require("node:path"));
     init_src2();
@@ -505919,7 +505881,7 @@ function issuesToGarbageItems(issues) {
     const type = mapRuleIdToGarbageType(issue.ruleId);
     if (type === null) continue;
     items.push({
-      id: issue.id || (0, import_node_crypto26.randomUUID)(),
+      id: issue.id || (0, import_node_crypto25.randomUUID)(),
       type,
       path: issue.file || "",
       size: 0,
@@ -505928,11 +505890,11 @@ function issuesToGarbageItems(issues) {
   }
   return items;
 }
-var import_node_crypto26, GARBAGE_RULE_TYPE_MAP;
+var import_node_crypto25, GARBAGE_RULE_TYPE_MAP;
 var init_item_mapper = __esm({
   "../garbage/src/item-mapper.ts"() {
     "use strict";
-    import_node_crypto26 = require("node:crypto");
+    import_node_crypto25 = require("node:crypto");
     GARBAGE_RULE_TYPE_MAP = {
       "garbage.scan.cleanup.dead-code": "dead-code",
       // 重复代码已按《07》O1 移交重构域：垃圾域不再登记该规则，故无 duplicate-code 条目。
@@ -506172,7 +506134,7 @@ var init_budgets = __esm({
 });
 
 // ../autoperf/src/engine.ts
-var os13, fs70, path74, import_node_perf_hooks, import_node_crypto27, PROBE_BUDGET_MAP, PROBE_UNIT, SOURCE_FILE_RE, AutoPerfEngine;
+var os13, fs70, path74, import_node_perf_hooks, import_node_crypto26, PROBE_BUDGET_MAP, PROBE_UNIT, SOURCE_FILE_RE, AutoPerfEngine;
 var init_engine4 = __esm({
   "../autoperf/src/engine.ts"() {
     "use strict";
@@ -506180,7 +506142,7 @@ var init_engine4 = __esm({
     fs70 = __toESM(require("node:fs"));
     path74 = __toESM(require("node:path"));
     import_node_perf_hooks = require("node:perf_hooks");
-    import_node_crypto27 = require("node:crypto");
+    import_node_crypto26 = require("node:crypto");
     init_src2();
     init_budgets();
     PROBE_BUDGET_MAP = {
@@ -506241,7 +506203,7 @@ var init_engine4 = __esm({
           );
           const unit = PROBE_UNIT[probe.probeName] ?? "ms";
           issues.push({
-            id: (0, import_node_crypto27.randomUUID)(),
+            id: (0, import_node_crypto26.randomUUID)(),
             ruleId: budget.ruleId,
             severity: budget.severity,
             category: "performance",
@@ -520615,7 +520577,7 @@ async function registerAutoPerfAdapter(inspectEngine) {
 
 // ../pipeline/src/sonarway-tool-adapter.ts
 var import_eslint2 = __toESM(require_api());
-var import_node_crypto28 = require("node:crypto");
+var import_node_crypto27 = require("node:crypto");
 init_src2();
 var META17 = {
   id: "sonarway",
@@ -520688,7 +520650,7 @@ var SonarwayToolAdapter = class {
         if (msg.message?.includes("Definition for rule")) continue;
         const severity = msg.severity === 2 ? "error" : "warning";
         issues.push({
-          id: (0, import_node_crypto28.randomUUID)(),
+          id: (0, import_node_crypto27.randomUUID)(),
           ruleId: `sonarjs/${msg.ruleId}`,
           severity,
           category: "quality",

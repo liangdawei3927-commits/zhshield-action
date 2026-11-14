@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: b7b448df0f297a7b
+// @zh-src-hash: 98fa042e36827327
 // @zh-src-files: 434
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -6277,7 +6277,8 @@ var init_zh_Hans = __esm({
           },
           stats: {
             total: "\u603B\u6F0F\u6D1E",
-            malware: "\u6076\u610F\u4EE3\u7801"
+            malware: "\u6076\u610F\u4EE3\u7801",
+            suppressed: "\u5DF2\u8C41\u514D"
           },
           degraded: {
             title: "\u672C\u6B21\u626B\u63CF\u5DF2\u964D\u7EA7\uFF0C\u7ED3\u679C\u53EF\u80FD\u4E0D\u5B8C\u6574",
@@ -6287,7 +6288,9 @@ var init_zh_Hans = __esm({
           skipped: {
             title: "\u4EE5\u4E0B\u68C0\u67E5\u672C\u6B21\u4E0D\u9002\u7528\uFF0C\u5DF2\u8DF3\u8FC7",
             detail: "{{tools}}\uFF1A\u5F53\u524D\u9879\u76EE\u4E0D\u6EE1\u8DB3\u9002\u7528\u524D\u63D0\uFF08\u5982\u7F3A\u5C11 package.json\uFF09\uFF0C\u5C5E\u9884\u671F\u88C1\u526A\uFF0C\u975E\u5DE5\u5177\u6545\u969C\uFF0C\u65E0\u9700\u5904\u7406\u3002"
-          }
+          },
+          suppressedHint: "\u4EE5\u4E0B\u6761\u76EE\u5DF2\u7531\u767D\u540D\u5355\u63A5\u53D7\u98CE\u9669\uFF0C\u4E0D\u8BA1\u5165\u8BC4\u5206\uFF1B\u7406\u7531/\u8D23\u4EFB\u4EBA/\u5230\u671F\u89C1\u5404\u884C",
+          suppressedMeta: "\u7406\u7531\uFF1A{{reason}} \xB7 \u8BA4\u9886\uFF1A{{operator}} \xB7 \u5230\u671F\uFF1A{{expires}}"
         },
         sentinel: {
           aiFixSource: "\u54E8\u5175\xB7\u76D1\u63A7",
@@ -8516,7 +8519,8 @@ var init_zh_Hant = __esm({
           },
           stats: {
             total: "\u7E3D\u6F0F\u6D1E",
-            malware: "\u60E1\u610F\u7A0B\u5F0F\u78BC"
+            malware: "\u60E1\u610F\u7A0B\u5F0F\u78BC",
+            suppressed: "\u5DF2\u8C41\u514D"
           },
           degraded: {
             title: "\u672C\u6B21\u6383\u63CF\u5DF2\u964D\u7D1A\uFF0C\u7D50\u679C\u53EF\u80FD\u4E0D\u5B8C\u6574",
@@ -8526,7 +8530,9 @@ var init_zh_Hant = __esm({
           skipped: {
             title: "\u4EE5\u4E0B\u6AA2\u67E5\u672C\u6B21\u4E0D\u9069\u7528\uFF0C\u5DF2\u8DF3\u904E",
             detail: "{{tools}}\uFF1A\u76EE\u524D\u5C08\u6848\u672A\u6EFF\u8DB3\u9069\u7528\u524D\u63D0\uFF08\u5982\u7F3A\u5C11 package.json\uFF09\uFF0C\u5C6C\u9810\u671F\u88C1\u6E1B\uFF0C\u975E\u5DE5\u5177\u6545\u969C\uFF0C\u7121\u9700\u8655\u7406\u3002"
-          }
+          },
+          suppressedHint: "\u4EE5\u4E0B\u689D\u76EE\u5DF2\u7531\u767D\u540D\u55AE\u63A5\u53D7\u98A8\u96AA\uFF0C\u4E0D\u8A08\u5165\u8A55\u5206\uFF1B\u7406\u7531/\u8CA0\u8CAC\u4EBA/\u5230\u671F\u898B\u5404\u884C",
+          suppressedMeta: "\u7406\u7531\uFF1A{{reason}} \xB7 \u8A8D\u9818\uFF1A{{operator}} \xB7 \u5230\u671F\uFF1A{{expires}}"
         },
         sentinel: {
           aiFixSource: "\u54E8\u5175\xB7\u76E3\u63A7",
@@ -10911,7 +10917,8 @@ var init_en = __esm({
           },
           stats: {
             total: "Vulnerabilities",
-            malware: "Malware"
+            malware: "Malware",
+            suppressed: "Waived"
           },
           degraded: {
             title: "Scan degraded; results may be incomplete",
@@ -10921,7 +10928,9 @@ var init_en = __esm({
           skipped: {
             title: "Not applicable to this project; skipped",
             detail: "{{tools}}: this project does not meet the prerequisites (e.g. missing package.json). Expected trimming, not a tool failure \u2014 no action needed."
-          }
+          },
+          suppressedHint: "These findings are accepted as risk via the whitelist and excluded from scoring; see reason/owner/expiry per row",
+          suppressedMeta: "Reason: {{reason}} \xB7 Owner: {{operator}} \xB7 Expires: {{expires}}"
         },
         sentinel: {
           aiFixSource: "Sentinel \xB7 Monitor",
@@ -13150,7 +13159,8 @@ var init_ko = __esm({
           },
           stats: {
             total: "\uCD1D \uCDE8\uC57D\uC810",
-            malware: "\uC545\uC131 \uCF54\uB4DC"
+            malware: "\uC545\uC131 \uCF54\uB4DC",
+            suppressed: "\uBA74\uC81C\uB428"
           },
           degraded: {
             title: "\uC2A4\uCE94\uC774 \uC131\uB2A5 \uC800\uD558\uB418\uC5B4 \uACB0\uACFC\uAC00 \uBD88\uC644\uC804\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
@@ -13160,7 +13170,9 @@ var init_ko = __esm({
           skipped: {
             title: "\uC774 \uD504\uB85C\uC81D\uD2B8\uC5D0 \uC801\uC6A9\uB418\uC9C0 \uC54A\uC544 \uAC74\uB108\uB6F4 \uAC80\uC0AC\uC785\uB2C8\uB2E4",
             detail: "{{tools}}: \uC774 \uD504\uB85C\uC81D\uD2B8\uB294 \uC801\uC6A9 \uC804\uC81C \uC870\uAC74\uC744 \uCDA9\uC871\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4(\uC608: package.json \uC5C6\uC74C). \uC608\uC815\uB41C \uC81C\uC678\uC774\uBA70 \uB3C4\uAD6C \uC624\uB958\uAC00 \uC544\uB2D9\uB2C8\uB2E4. \uC870\uCE58\uAC00 \uD544\uC694\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."
-          }
+          },
+          suppressedHint: "\uC544\uB798 \uD56D\uBAA9\uC740 \uD654\uC774\uD2B8\uB9AC\uC2A4\uD2B8\uB85C \uC704\uD5D8\uC744 \uC218\uC6A9\uD558\uC5EC \uC810\uC218\uC5D0 \uBC18\uC601\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC0AC\uC720/\uB2F4\uB2F9/\uB9CC\uB8CC\uB294 \uAC01 \uD589 \uCC38\uC870",
+          suppressedMeta: "\uC0AC\uC720: {{reason}} \xB7 \uB2F4\uB2F9: {{operator}} \xB7 \uB9CC\uB8CC: {{expires}}"
         },
         sentinel: {
           aiFixSource: "\uC13C\uD2F0\uB12C\xB7\uBAA8\uB2C8\uD130\uB9C1",
@@ -15467,7 +15479,8 @@ var init_ja = __esm({
           },
           stats: {
             total: "\u7DCF\u8106\u5F31\u6027",
-            malware: "\u30DE\u30EB\u30A6\u30A7\u30A2"
+            malware: "\u30DE\u30EB\u30A6\u30A7\u30A2",
+            suppressed: "\u9664\u5916\u6E08\u307F"
           },
           degraded: {
             title: "\u30B9\u30AD\u30E3\u30F3\u304C\u7E2E\u9000\u3057\u305F\u305F\u3081\u3001\u7D50\u679C\u306F\u4E0D\u5B8C\u5168\u306A\u53EF\u80FD\u6027\u304C\u3042\u308A\u307E\u3059",
@@ -15477,7 +15490,9 @@ var init_ja = __esm({
           skipped: {
             title: "\u4ECA\u56DE\u306E\u691C\u67FB\u306F\u5BFE\u8C61\u5916\u306E\u305F\u3081\u30B9\u30AD\u30C3\u30D7\u3057\u307E\u3057\u305F",
             detail: "{{tools}}: \u3053\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306F\u9069\u7528\u524D\u63D0\u3092\u6E80\u305F\u3057\u3066\u3044\u307E\u305B\u3093\uFF08package.json \u304C\u7121\u3044\u7B49\uFF09\u3002\u60F3\u5B9A\u3055\u308C\u305F\u9664\u5916\u3067\u3042\u308A\u3001\u30C4\u30FC\u30EB\u306E\u6545\u969C\u3067\u306F\u3042\u308A\u307E\u305B\u3093\u3002\u5BFE\u5FDC\u306F\u4E0D\u8981\u3067\u3059\u3002"
-          }
+          },
+          suppressedHint: "\u4EE5\u4E0B\u306E\u9805\u76EE\u306F\u30DB\u30EF\u30A4\u30C8\u30EA\u30B9\u30C8\u306B\u3088\u308A\u30EA\u30B9\u30AF\u8A31\u5BB9\u3055\u308C\u3001\u30B9\u30B3\u30A2\u306B\u542B\u307E\u308C\u307E\u305B\u3093\u3002\u7406\u7531/\u62C5\u5F53/\u671F\u9650\u306F\u5404\u884C\u3092\u53C2\u7167",
+          suppressedMeta: "\u7406\u7531\uFF1A{{reason}} \xB7 \u62C5\u5F53\uFF1A{{operator}} \xB7 \u671F\u9650\uFF1A{{expires}}"
         },
         sentinel: {
           aiFixSource: "\u30BB\u30F3\u30C1\u30CD\u30EB\u30FB\u76E3\u8996",
@@ -518763,12 +518778,12 @@ var TypeScriptAdapter = class {
     try {
       return await this.runTscScan(options2, start, category);
     } catch (error) {
-      return this.buildResult(
+      return this.buildResult({
         start,
         category,
-        [],
-        error.message || this.tr("engine.inspect.tool.tsc.runFailed")
-      );
+        issues: [],
+        error: error.message || this.tr("engine.inspect.tool.tsc.runFailed")
+      });
     }
   }
   /** 解析项目并逐个运行 tsc，聚合结果 */
@@ -518776,18 +518791,18 @@ var TypeScriptAdapter = class {
     const projectPath = path43.resolve(options2.projectPath);
     const projects = resolveTscProjects(projectPath);
     if (projects.length === 0) {
-      return this.buildResult(start, category, []);
+      return this.buildResult({ start, category, issues: [] });
     }
     try {
       await fs40.promises.access(path43.join(projectPath, "node_modules"));
     } catch {
-      return this.buildResult(
+      return this.buildResult({
         start,
         category,
-        [],
-        this.tr("engine.inspect.tool.tsc.depsMissing"),
-        "unavailable"
-      );
+        issues: [],
+        error: this.tr("engine.inspect.tool.tsc.depsMissing"),
+        statusOverride: "unavailable"
+      });
     }
     const command = await this.commands.resolve(projectPath);
     const { issues, envArtifactCount, infraError } = projects.length === 1 ? await this.runAllProjects({
@@ -518798,21 +518813,21 @@ var TypeScriptAdapter = class {
       category
     }) : await this.runBuildMode({ command, projects, options: options2, category, projectPath });
     if (issues.length > 0) {
-      return this.buildResult(start, category, issues);
+      return this.buildResult({ start, category, issues });
     }
     if (infraError) {
-      return this.buildResult(start, category, [], infraError);
+      return this.buildResult({ start, category, issues: [], error: infraError });
     }
     if (envArtifactCount > 0) {
-      return this.buildResult(
+      return this.buildResult({
         start,
         category,
-        [],
-        this.tr("engine.inspect.tool.tsc.unresolvedEnv"),
-        "unavailable"
-      );
+        issues: [],
+        error: this.tr("engine.inspect.tool.tsc.unresolvedEnv"),
+        statusOverride: "unavailable"
+      });
     }
-    return this.buildResult(start, category, []);
+    return this.buildResult({ start, category, issues: [] });
   }
   /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues / 环境伪影数 / 首个基础设施错误 */
   async runAllProjects(params) {
@@ -518924,7 +518939,7 @@ ${err.stderr ?? ""}`;
       return this.handleTscExecutionError(error, category, projectPath);
     }
   }
-  buildResult(start, category, issues, error, statusOverride) {
+  buildResult({ start, issues, error, statusOverride }) {
     const status = statusOverride ?? (error && issues.length === 0 ? "error" : "available");
     return buildToolResult({
       tool: "tsc",
@@ -522645,7 +522660,13 @@ function reportNoGateRules(summary, env, log) {
   log(`[\u95E8\u7981] \u9700\u8981\u771F\u7A7A\u95E8\u7981\u8BF7\u8BBE ${REQUIRE_SOP_ENV}=1\uFF08\u6B64\u9879\u5C06\u5224\u4E3A\u73AF\u5883\u4E0D\u5B8C\u6574\u5E76\u9000\u51FA 2\uFF09`);
   return {};
 }
-function finalizeScan(runner, opts, blocked, exit = (code) => process.exit(code), log = (line) => console.error(line)) {
+function finalizeScan({
+  runner,
+  opts,
+  blocked,
+  exit = (code) => process.exit(code),
+  log = (line) => console.error(line)
+}) {
   const gate = opts.sop ? reportPostScanGates(runner, log) : {};
   if (blocked) return exit(1);
   if (process.exitCode) return exit(process.exitCode);
@@ -523975,20 +523996,20 @@ async function runGuardHookCommand({
       `[CLI] \u95E8\u7981\u94A9\u5B50\uFF08${hook}\uFF09\u65E0\u6CD5\u5224\u5B9A\uFF1A\u672A\u53D1\u73B0\u4F9B\u5E94\u5546\u57DF\u5FEB\u7167\uFF08inspect/security/deps \u5747\u672A\u843D\u76D8\uFF09\u3002
 [CLI] \u8FD9\u4E0D\u662F\u901A\u8FC7\u2014\u2014\u8BF7\u5148\u8FD0\u884C\u5BF9\u5E94\u57DF\uFF08\u684C\u9762\u7AEF\u4E00\u952E\u4F53\u68C0\u6216 \`zhshield pipeline --full\`\uFF09\u3002`
     );
-    finalizeScan(runner, { sop: false }, false);
+    finalizeScan({ runner, opts: { sop: false }, blocked: false });
     return;
   }
   const report = await runner.runSopGuard({ dryRun: opts.dryRun, conclusions });
   if (report.total === 0) {
     finishUndeterminedHook("[CLI] \u95E8\u7981\u94A9\u5B50\uFF1ASOP \u89C4\u5219\u4E3A 0 \u6761\uFF0C\u672C\u6B21\u672A\u5B9E\u9645\u5224\u5B9A\u3002");
-    finalizeScan(runner, { sop: false }, false);
+    finalizeScan({ runner, opts: { sop: false }, blocked: false });
     return;
   }
   console.log(reporter.formatRuleEngine(report).text);
   const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
   writeReportFile(opts, report, findings, { projectDir, command: "guard-hook" });
   applyDegradedGuard(report);
-  finalizeScan(runner, { sop: false }, blocked);
+  finalizeScan({ runner, opts: { sop: false }, blocked });
 }
 
 // src/domain-args.ts
@@ -524059,7 +524080,7 @@ async function runGuardCommand(runner, opts, reporter, projectDir) {
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     writeReportFile(opts, report, findings, { projectDir, command: "guard-sop" });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
@@ -524074,7 +524095,7 @@ async function runGuardCommand(runner, opts, reporter, projectDir) {
     console.log(formatted.text);
     writeReportFile(opts, report, findings, { projectDir, command: "guard" });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   }
 }
 async function runInspectCommand(runner, opts, reporter, projectDir) {
@@ -524093,7 +524114,7 @@ async function runInspectCommand(runner, opts, reporter, projectDir) {
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     writeReportFile(opts, report, findings, { projectDir, command: "inspect-sop" });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   } else {
     const report = await runner.runInspect();
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
@@ -524108,7 +524129,7 @@ async function runInspectCommand(runner, opts, reporter, projectDir) {
     console.log(formatted.text);
     writeReportFile(opts, report, findings, { projectDir, command: "inspect" });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   }
 }
 async function runRefactorCommand(runner, opts, reporter, projectDir) {
@@ -524125,7 +524146,7 @@ async function runRefactorCommand(runner, opts, reporter, projectDir) {
   });
   console.log(formatted.text);
   writeReportFile(opts, report, findings, { projectDir, command: "refactor" });
-  finalizeScan(runner, opts, blocked);
+  finalizeScan({ runner, opts, blocked });
 }
 async function baselineCapture(runner, projectDir) {
   const report = await runner.runInspect({ skipBaseline: true });
@@ -524268,7 +524289,7 @@ async function runPipelineCommand(runner, opts, ctx) {
   console.log(formatted.text);
   writeReportFile(opts, report, findings, { projectDir: ctx.projectDir, command: "pipeline" });
   applyDegradedGuard(void 0, [report.guard, report.inspect]);
-  finalizeScan(runner, opts, blocked);
+  finalizeScan({ runner, opts, blocked });
 }
 
 // src/capability-command.ts

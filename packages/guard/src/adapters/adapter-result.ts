@@ -28,6 +28,52 @@ export function makeAdapterResult(
   };
 }
 
+/** ESLint 消息形状统一在 `@zh/shared` 定义，此处转出保持适配器侧导入路径不变。 */
+export type { EslintMessage } from '@zh/shared';
+
+/**
+ * lint 类适配器共用的「错误 / 警告 / 通过」三态判定。
+ *
+ * eslint-check 与 sonarway-eslint 两个适配器此前各写一遍同一套策略：
+ * 有错误 → failed；有警告且 check.severity 不是 error → warning；否则 passed。
+ * 这是**门禁严重度**规则（决定该检查是否阻断合并），两处各写一份意味着策略
+ * 可能在一边被单独改掉 —— 而两条 lint 通道检出的是同一类问题，口径必须一致。
+ *
+ * 差异只有工具名与「通过」话术，由调用方传入。
+ */
+export function buildLintOutcome(
+  check: CheckConfig,
+  params: {
+    /** 工具显示名（拼进 failed / warning 的 message） */
+    tool: string;
+    errors: readonly (string | undefined)[];
+    warnings: readonly (string | undefined)[];
+    /** 通过时的话术 */
+    passedMessage: string;
+  },
+): CheckResult {
+  const { tool, errors, warnings, passedMessage } = params;
+  if (errors.length > 0) {
+    return makeAdapterResult(
+      check,
+      'failed',
+      `${tool} 发现 ${errors.length} 个错误:\n${errors.join('\n')}`,
+      { errors, warnings, totalErrors: errors.length, totalWarnings: warnings.length },
+    );
+  }
+
+  if (warnings.length > 0 && check.severity !== 'error') {
+    return makeAdapterResult(
+      check,
+      'warning',
+      `${tool} 发现 ${warnings.length} 个警告:\n${warnings.join('\n')}`,
+      { errors, warnings, totalErrors: 0, totalWarnings: warnings.length },
+    );
+  }
+
+  return makeAdapterResult(check, 'passed', passedMessage);
+}
+
 /** 从上下文解析待扫描目录；两者都缺失时抛出带 checkId 的定位错误 */
 export function resolveScanTargetDir(context: AdapterScanContext, checkId: string): string {
   const targetDir = context.repoRoot || context.projectPath;

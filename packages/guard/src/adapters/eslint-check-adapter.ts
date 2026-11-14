@@ -1,5 +1,10 @@
 import type { Adapter, CheckConfig, CheckResult } from '../types';
-import { makeAdapterResult, makeSkippedAdapterResult } from './adapter-result';
+import {
+  buildLintOutcome,
+  makeAdapterResult,
+  makeSkippedAdapterResult,
+} from './adapter-result';
+import type { EslintMessage } from './adapter-result';
 import {
   findEslintConfigDir,
   resolveEslintTargetDir,
@@ -28,15 +33,6 @@ interface EslintRawResult {
 /** ESLint v9+ 在无配置文件时的报错特征（英文原文，随版本略有差异） */
 const MISSING_CONFIG_RE =
   /couldn't find an eslint\.config|no eslint configuration found|eslint\.config\.\(js\|mjs\|cjs\)|Please install ESLint configuration/i;
-
-/** ESLint JSON 输出中的单条消息 */
-interface EslintMessage {
-  ruleId?: string;
-  message?: string;
-  line?: number;
-  column?: number;
-  severity?: number;
-}
 
 /** ESLint JSON 输出中的单个文件项 */
 interface EslintFile {
@@ -193,32 +189,19 @@ export class GuardESLintCheckAdapter implements Adapter {
     return this.buildLintResult(check, files, errors, warnings);
   }
 
-  /** 按错误 / 警告 / 通过三种情况构造结果 */
+  /** 按错误 / 警告 / 通过三种情况构造结果（三态策略见 buildLintOutcome） */
   private buildLintResult(
     check: CheckConfig,
     files: Record<string, unknown>[],
     errors: string[],
     warnings: string[],
   ): CheckResult {
-    if (errors.length > 0) {
-      return makeAdapterResult(
-        check,
-        'failed',
-        `ESLint 发现 ${errors.length} 个错误:\n${errors.join('\n')}`,
-        { errors, warnings, totalErrors: errors.length, totalWarnings: warnings.length },
-      );
-    }
-
-    if (warnings.length > 0 && check.severity !== 'error') {
-      return makeAdapterResult(
-        check,
-        'warning',
-        `ESLint 发现 ${warnings.length} 个警告:\n${warnings.join('\n')}`,
-        { errors, warnings, totalErrors: 0, totalWarnings: warnings.length },
-      );
-    }
-
-    return makeAdapterResult(check, 'passed', `ESLint 检查通过（${files.length} 个文件）`);
+    return buildLintOutcome(check, {
+      tool: 'ESLint',
+      errors,
+      warnings,
+      passedMessage: `ESLint 检查通过（${files.length} 个文件）`,
+    });
   }
 
   private collectMessages(files: Record<string, unknown>[]): {

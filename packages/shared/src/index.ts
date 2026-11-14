@@ -267,6 +267,7 @@ export type { RefactorBaselineCounts, RefactorBaselineRecord } from './refactor-
 export { safeReadDirEntries, expandHome } from './fs-safe';
 export { NOISE_DIRS } from './noise-dirs';
 export { constantTimeEqual } from './constant-time';
+export type { EslintMessage } from './lint-message';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
 export {

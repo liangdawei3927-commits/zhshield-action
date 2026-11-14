@@ -10,18 +10,12 @@ import { ESLint } from 'eslint';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import type { Adapter, CheckConfig, CheckResult } from '../types';
-import { makeAdapterResult } from './adapter-result';
+import { buildLintOutcome, makeAdapterResult } from './adapter-result';
+import type { EslintMessage } from './adapter-result';
 import { buildSonarwayConfig } from './eslint-sonarway-config';
 
-/** ESLint 输出消息 */
-interface LintMessage {
-  ruleId?: string;
-  message?: string;
-  line?: number;
-  column?: number;
-  severity?: number;
-  fatal?: boolean;
-}
+/** ESLint 输出消息：形状统一在 `@zh/shared` 的 EslintMessage（含 fatal） */
+type LintMessage = EslintMessage;
 
 /** 单个文件的 lint 结果 */
 interface LintResult {
@@ -103,31 +97,18 @@ export class GuardSonarwayESLintAdapter implements Adapter {
     return this.buildNormalizedResult(check, errors, warnings);
   }
 
-  /** 按错误/警告/通过聚合出最终 CheckResult（基于已收集的消息） */
+  /** 按错误/警告/通过聚合出最终 CheckResult（三态策略见 buildLintOutcome） */
   private buildNormalizedResult(
     check: CheckConfig,
     errors: (string | undefined)[],
     warnings: (string | undefined)[],
   ): CheckResult {
-    if (errors.length > 0) {
-      return makeAdapterResult(
-        check,
-        'failed',
-        `SonarWay 发现 ${errors.length} 个错误:\n${errors.join('\n')}`,
-        { errors, warnings, totalErrors: errors.length, totalWarnings: warnings.length },
-      );
-    }
-
-    if (warnings.length > 0 && check.severity !== 'error') {
-      return makeAdapterResult(
-        check,
-        'warning',
-        `SonarWay 发现 ${warnings.length} 个警告:\n${warnings.join('\n')}`,
-        { errors, warnings, totalErrors: 0, totalWarnings: warnings.length },
-      );
-    }
-
-    return makeAdapterResult(check, 'passed', 'SonarWay 检查通过');
+    return buildLintOutcome(check, {
+      tool: 'SonarWay',
+      errors,
+      warnings,
+      passedMessage: 'SonarWay 检查通过',
+    });
   }
 
   /** 单条消息按 severity 落位（errors / warnings），fatal 错误计入 errors */

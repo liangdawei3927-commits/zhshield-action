@@ -17,6 +17,7 @@ import {
   type ToolMeta,
   type ToolResult,
   type ToolScanOptions,
+  type EslintMessage,
 } from '@zh/shared';
 import { buildSonarwayConfig } from '@zh/guard';
 
@@ -32,15 +33,8 @@ const META: ToolMeta = {
   license: 'LGPL-3.0',
 };
 
-/** ESLint Node API 输出的单条消息 */
-interface LintMessage {
-  ruleId?: string;
-  message?: string;
-  line?: number;
-  column?: number;
-  severity?: number;
-  fatal?: boolean;
-}
+/** ESLint Node API 输出的单条消息：形状统一在 `@zh/shared` 的 EslintMessage（含 fatal） */
+type LintMessage = EslintMessage;
 
 /** ESLint Node API 输出的单个文件项 */
 interface LintResult {

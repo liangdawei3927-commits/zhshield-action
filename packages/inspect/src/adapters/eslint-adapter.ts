@@ -8,6 +8,7 @@ import type {
   Issue,
   IssueCategory,
   AccessScope,
+  EslintMessage,
 } from '@zh/shared';
 import { resolveEslintConfigPath, resolveEslintTargetDir } from '@zh/shared';
 import {
@@ -34,15 +35,8 @@ import { resolveInjectedConfigPath } from './injected-config';
  */
 const DEFAULT_SCAN_TIMEOUT_MS = 300_000;
 
-/** ESLint JSON 输出中的单条消息 */
-interface EslintOutputMessage {
-  ruleId?: string;
-  message?: string;
-  line?: number;
-  column?: number;
-  severity?: number;
-  fix?: unknown;
-}
+/** ESLint JSON 输出中的单条消息：形状统一在 `@zh/shared` 的 EslintMessage（含 fix） */
+type EslintOutputMessage = EslintMessage;
 
 /** ESLint JSON 输出中的单个文件项 */
 interface EslintOutputFile {

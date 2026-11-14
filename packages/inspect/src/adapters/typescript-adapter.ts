@@ -207,6 +207,18 @@ interface ExecAndParseTscParams {
   timeout?: number | undefined;
 }
 
+/** TypeScriptAdapter.buildResult 的执行参数（单对象参数，避免形参超限） */
+interface BuildResultParams {
+  start: number;
+  /** 诊断分类；当前实现不消费，随签名保留以维持调用方语义 */
+  category: IssueCategory;
+  issues: Issue[];
+  /** 执行错误说明；仅当无 issues 时参与 status 推断 */
+  error?: string;
+  /** 显式状态覆盖（环境伪影降级为 unavailable）；缺省按 error/issues 推断 */
+  statusOverride?: ToolResultStatus;
+}
+
 /**
  * 构建模式（`tsc -b`）的参数：一次进程检查全部 tsconfig，不再逐包起进程。
  *
@@ -254,12 +266,12 @@ export class TypeScriptAdapter implements ToolAdapter {
     try {
       return await this.runTscScan(options, start, category);
     } catch (error: unknown) {
-      return this.buildResult(
+      return this.buildResult({
         start,
         category,
-        [],
-        (error as Error).message || this.tr('engine.inspect.tool.tsc.runFailed'),
-      );
+        issues: [],
+        error: (error as Error).message || this.tr('engine.inspect.tool.tsc.runFailed'),
+      });
     }
   }
 
@@ -275,7 +287,7 @@ export class TypeScriptAdapter implements ToolAdapter {
     const projects = resolveTscProjects(projectPath);
     if (projects.length === 0) {
       // 非 TypeScript 项目：无 tsconfig 可检查，按通过处理（不阻断）
-      return this.buildResult(start, category, []);
+      return this.buildResult({ start, category, issues: [] });
     }
     // 依赖未安装（node_modules 缺失）→ 类型检查无法给出可信结论。
     // 此时 tsc 会对每个 import 报 TS2307，门禁若据此阻断就等于"clone 后未安装依赖就被拦死"——
@@ -285,13 +297,13 @@ export class TypeScriptAdapter implements ToolAdapter {
     try {
       await fs.promises.access(path.join(projectPath, 'node_modules'));
     } catch {
-      return this.buildResult(
+      return this.buildResult({
         start,
         category,
-        [],
-        this.tr('engine.inspect.tool.tsc.depsMissing'),
-        'unavailable',
-      );
+        issues: [],
+        error: this.tr('engine.inspect.tool.tsc.depsMissing'),
+        statusOverride: 'unavailable',
+      });
     }
     const command = await this.commands.resolve(projectPath);
     // 单 tsconfig：沿用逐项目模式（保持既有行为与用例）
@@ -308,24 +320,24 @@ export class TypeScriptAdapter implements ToolAdapter {
         : await this.runBuildMode({ command, projects, options, category, projectPath });
     // 真有用户源码类型错误 ⇒ 如实上报（门禁据此合理阻断）
     if (issues.length > 0) {
-      return this.buildResult(start, category, issues);
+      return this.buildResult({ start, category, issues });
     }
     // tsc 自身崩溃（无诊断输出）⇒ 执行错误
     if (infraError) {
-      return this.buildResult(start, category, [], infraError);
+      return this.buildResult({ start, category, issues: [], error: infraError });
     }
     // 只产出环境/安装类伪影（node_modules 报错、模块解析失败）⇒ 无法给出确定结论，降级而非阻断
     if (envArtifactCount > 0) {
-      return this.buildResult(
+      return this.buildResult({
         start,
         category,
-        [],
-        this.tr('engine.inspect.tool.tsc.unresolvedEnv'),
-        'unavailable',
-      );
+        issues: [],
+        error: this.tr('engine.inspect.tool.tsc.unresolvedEnv'),
+        statusOverride: 'unavailable',
+      });
     }
     // 干净：零错误
-    return this.buildResult(start, category, []);
+    return this.buildResult({ start, category, issues: [] });
   }
 
   /** 有界并发运行各 tsconfig 的 tsc 并聚合 issues / 环境伪影数 / 首个基础设施错误 */
@@ -461,13 +473,7 @@ export class TypeScriptAdapter implements ToolAdapter {
     }
   }
 
-  private buildResult(
-    start: number,
-    category: IssueCategory,
-    issues: Issue[],
-    error?: string,
-    statusOverride?: ToolResultStatus,
-  ): ToolResult {
+  private buildResult({ start, issues, error, statusOverride }: BuildResultParams): ToolResult {
     const status = statusOverride ?? (error && issues.length === 0 ? 'error' : 'available');
     return buildToolResult({
       tool: 'tsc',

@@ -1,6 +1,7 @@
 import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { WhitelistManager } from '@zh/guard';
+import { filterWhitelisted } from './whitelist-suppression';
 import { buildHealthDimensions, SCORE_VERSION } from '@zh/scoring';
 import type { PipelineReport } from '@zh/pipeline';
 import {
@@ -374,16 +375,6 @@ export async function readAggregatedDiagnostics(
   return mergeGroups(projectPath, groups, latest);
 }
 
-/** 依据 <project>/.zhshield/whitelist.yml 过滤被白名单压制的误报条目（rule+file 精确匹配） */
-function filterWhitelisted(
-  whitelist: WhitelistManager,
-  entries: readonly DiagnosticEntry[],
-): readonly DiagnosticEntry[] {
-  return entries.filter(
-    (entry) => !(entry.file && whitelist.isWhitelisted(entry.ruleId, entry.file).whitelisted),
-  );
-}
-
 /** pipeline 报告一键归一化并落盘（dryRun 由调用方决定是否跳过） */
 export async function persistDiagnostics(
   projectPath: string,
@@ -392,7 +383,7 @@ export async function persistDiagnostics(
 ): Promise<string> {
   const whitelist = new WhitelistManager(projectPath);
   await whitelist.load();
-  const issues = filterWhitelisted(whitelist, normalizePipelineReport(report));
+  const issues = filterWhitelisted(whitelist, normalizePipelineReport(report)).kept;
   const diagnostics = buildDiagnosticsReport(
     { path: projectPath, name: basename(projectPath) },
     issues,
@@ -445,7 +436,7 @@ export async function persistDiagnosticsFromEntries(
   await whitelist.load();
   const diagnostics = buildDiagnosticsReport(
     { path: projectPath, name: basename(projectPath) },
-    filterWhitelisted(whitelist, entries),
+    filterWhitelisted(whitelist, entries).kept,
     scanTimeAnchor(options?.generatedAt),
   );
   return await writeDiagnosticsFile(

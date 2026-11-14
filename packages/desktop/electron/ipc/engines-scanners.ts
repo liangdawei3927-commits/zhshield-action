@@ -23,6 +23,7 @@ import {
   readDomainSnapshot,
   normalizeSecuritySource,
   normalizeRefactorSource,
+  applyWhitelistFilter,
 } from '../zh-diagnostics';
 import {
   readDashboardState,
@@ -40,6 +41,8 @@ import { computeDomainSnapshotScore } from '../domain-snapshot-score';
 import type { DomainDimensionScore } from '../zh-diagnostics-types';
 import {
   toSecurityScanReportData,
+  stripSuppressed,
+  withSuppressed,
   type SecurityScanReportData,
   type PerformanceReportData,
 } from './report-format';
@@ -125,19 +128,26 @@ export async function runSecurityHandler(
     }
     const task = manager.start('security', projectPath);
     const report = (await manager.waitFor(task.id)) as SecurityScanReport;
-    const data = toSecurityScanReportData(report);
-    // P2：security 域快照当场出分（与 compose-on-read 同口径）：
-    // 条目 = 双路合并结果（新漏洞 + 既有密钥），activeSecrets 取 dashboard-state 同源。
-    const vulnEntries = normalizeSecuritySource(data);
+    const rawData = toSecurityScanReportData(report);
+    // ── 白名单豁免：必须「先过滤、再出分」 ──
+    // 旧实现用**未过滤**条目算 dimensionScore、落盘时才过滤白名单，导致「豁免了但
+    // 分数一分不降」（2026-11-14 实测：KMS 条目加白名单后仍显示 96.4 分 · 1 个中危）。
+    // 分数与条目必须同源：先过滤再出分，两者才不可能漂移。
+    const { kept: vulnEntries, suppressed } = await applyWhitelistFilter(
+      projectPath,
+      normalizeSecuritySource(rawData),
+    );
+    // 明细同步剔除被豁免项：否则「列表里没有、评分里却算它」又是一处自相矛盾
+    const data = stripSuppressed(rawData, suppressed);
     const [prevSnapshot, state] = await Promise.all([
       readDomainSnapshot(projectPath, 'security').catch(() => null),
       readDashboardState(projectPath).catch(() => null),
     ]);
-    const mergedEntries = mergeSecurityEntries(
-      prevSnapshot?.issues ?? [],
-      vulnEntries,
-      'vuln',
-    );
+    // 合并会带回上一轮快照里的条目：那些条目可能是本轮扫描不再产出、但**早已被
+    // 豁免**的存量（旧版本落盘时还没过滤）。故合并后要再过一遍白名单，否则
+    // 豁免只在「首次扫描」生效，下一次就又回到分数里（回归型假绿变假红）。
+    const mergedRaw = mergeSecurityEntries(prevSnapshot?.issues ?? [], vulnEntries, 'vuln');
+    const { kept: mergedEntries } = await applyWhitelistFilter(projectPath, mergedRaw);
     const activeSecrets = state?.secrets?.activeCount ?? null;
     const dimensionScore = computeDomainSnapshotScore({
       dimension: 'security',
@@ -157,7 +167,7 @@ export async function runSecurityHandler(
         e instanceof Error ? e.message : String(e),
       );
     }
-    return data;
+    return withSuppressed(data, suppressed);
   } catch (err) {
     rethrowIfCancelled(err); // 用户点「停止」不是失败：原样抛给渲染层静默处理
     // P1-B：失败不再返回空报告。空报告 = 0 问题 = 满分 100，

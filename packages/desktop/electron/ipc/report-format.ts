@@ -2,9 +2,18 @@
  * 报告类型转换（report-format.ts）
  *
  * 引擎原生类型 → 页面期望的序列化类型。纯函数，无 Electron 依赖。
+ *
+ * 白名单豁免的「剔除 + 挂载」也放这里：主进程（ipc/engines-scanners）与 worker
+ * 进程（pipeline-jobs）两条链路都要用同一份实现，各写一份必然漂移 —— 一条过滤、
+ * 另一条不过滤，用户就会看到「安全页没有、项目体检有」的同一处问题。
  */
 
 import type { GuardReport } from '@zh/guard';
+import {
+  toSuppressedDisplay,
+  type SuppressedDiagnostic,
+  type SuppressedDisplay,
+} from '../whitelist-suppression';
 import type { AdapterResult, InspectionReport } from '@zh/inspect';
 import type { SecurityScanReport } from '@zh/security';
 import type { HealthScore } from '@zh/scoring';
@@ -69,6 +78,14 @@ export interface SecurityScanReportData {
   }>;
   /** 安全评分 0-100 */
   securityScore: number;
+  /**
+   * 被白名单豁免的条目（已从 findings 剔除、且**不计入评分**）。
+   *
+   * 为什么要单独透传而不是只给个计数：豁免的价值在于「知道它被谁、为什么、
+   * 到什么时候为止放过」，只给数字就分不清「豁免了 1 条」和「漏了 1 条」。
+   * 缺省 = 没有豁免（向后兼容旧报告）。
+   */
+  suppressed?: SuppressedDisplay[];
   /** 规则通道求值账（R7）：只有计数时用户无法定位「哪条没跑、为什么」 */
   ruleChannel?: { ran: boolean; skipped: number; degraded: number };
   /** 逐条规则明细：页面据此分桶展示（degraded 黄 / skipped 中性） */
@@ -224,6 +241,56 @@ function getCoverageGap(
 ): boolean {
   if (a.skipReason === 'out-of-scope') return false;
   return a.status === 'unavailable' || a.status === 'skipped' || a.degraded === true;
+}
+
+/**
+ * 从页面报告明细里剔除被白名单豁免的条目，并重算汇总计数。
+ *
+ * 为什么不能只靠「落盘时过滤」：报告对象会直接回传渲染层，若不在这里剔除，
+ * 就会出现「明细列着 1 条、评分按 0 条算」的自相矛盾——用户会以为豁免没生效。
+ * 匹配键用 ruleId（`normalizeSecuritySource` 把它取自 finding.id / malware.id）。
+ *
+ * 不重算 `securityScore`：该字段不参与任何评分（十域评分走 dimensionScore），
+ * 且其公式在 `@zh/security.calculateSecurityScore`、此处重写等于复制第二份真源。
+ */
+export function stripSuppressed(
+  data: SecurityScanReportData,
+  suppressed: readonly SuppressedDiagnostic[],
+): SecurityScanReportData {
+  if (suppressed.length === 0) return data;
+  const ids = new Set(suppressed.map((s) => s.entry.ruleId));
+  const findings = data.findings.filter((f) => !ids.has(f.id));
+  const malware = data.malware.filter((m) => !ids.has(m.id));
+  if (findings.length === data.findings.length && malware.length === data.malware.length) {
+    return data;
+  }
+  const countBy = (severity: string): number =>
+    findings.filter((f) => f.severity === severity).length;
+  return {
+    ...data,
+    findings,
+    malware,
+    summary: {
+      ...data.summary,
+      total: findings.length,
+      critical: countBy('critical'),
+      high: countBy('high'),
+      medium: countBy('medium'),
+      low: countBy('low'),
+      malwareTotal: malware.length,
+    },
+  };
+}
+
+/** 把豁免清单挂到报告上（页面据此显示「已豁免 N 项」并可展开看理由/责任人/到期） */
+export function withSuppressed(
+  data: SecurityScanReportData,
+  suppressed: readonly SuppressedDiagnostic[],
+): SecurityScanReportData {
+  if (suppressed.length === 0) return data;
+  // 投影转换只此一份（whitelist-suppression 的 toSuppressedDisplay），
+  // 避免这里再抄一遍字段清单 —— 加字段时漏改一处就会静默丢数据。
+  return { ...data, suppressed: suppressed.map(toSuppressedDisplay) };
 }
 
 export function toSecurityScanReportData(

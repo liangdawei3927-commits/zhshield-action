@@ -291,6 +291,17 @@ export interface SecurityScanReportData {
     evidence: string;
   }>;
   securityScore: number;
+  /**
+   * 被白名单豁免的条目：已从 findings/malware 剔除，且**不计入评分**。
+   * 页面据此显示「已豁免 N 项」并可展开看理由/责任人/到期，而非静默消失。
+   */
+  suppressed?: Array<{
+    ruleId: string;
+    message: string;
+    reason: string;
+    operator: string;
+    expiresAt?: string;
+  }>;
   metadata: {
     duration: number;
     timestamp: string;

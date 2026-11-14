@@ -32,6 +32,10 @@ export {
   mergeSecurityEntries,
 } from './zh-diagnostics-persist';
 
+export { filterWhitelisted, applyWhitelistFilter } from './whitelist-suppression';
+
+export type { SuppressedDiagnostic, WhitelistFilterResult } from './whitelist-suppression';
+
 export {
   normalizePerformanceData,
   normalizeDepsSource,

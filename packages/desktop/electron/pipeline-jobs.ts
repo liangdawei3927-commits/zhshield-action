@@ -11,7 +11,8 @@
  */
 import { t } from '@zh/i18n';
 import { serializePipelineReport } from './pipeline-protocol';
-import { toSecurityScanReportData } from './ipc/report-format';
+import { toSecurityScanReportData, stripSuppressed, withSuppressed } from './ipc/report-format';
+import { applyWhitelistFilter, normalizeSecuritySource } from './zh-diagnostics';
 import { progress, send } from './pipeline-ipc';
 import { createLoadedRunner } from './pipeline-runner-factory';
 import { loadGuardConclusions } from './pipeline-sop';
@@ -67,6 +68,31 @@ async function persistSecurityReport(projectPath: string, report: unknown): Prom
       err instanceof Error ? err.message : String(err),
     );
   }
+}
+
+/**
+ * 安全扫描结果的落盘（含白名单豁免），worker 链路专用。
+ *
+ * 为什么单独一段而不是留在 `runSecurityJob` 里：该函数主职是「跑域 + 上报进度」，
+ * 塞进映射/过滤/写盘会把方法顶过 80 行阈值，也让「扫描」和「留存」两件事混在一起。
+ *
+ * 白名单豁免必须与主进程 `runSecurityHandler` 同口径：两条链路各写一份必然漂移，
+ * 同一条已知问题会在一个入口显示、另一个入口消失。
+ */
+function persistSecurityOutcome(projectPath: string, rawReport: unknown): Promise<void> {
+  return (async () => {
+    const data = toSecurityScanReportData(
+      rawReport as Parameters<typeof toSecurityScanReportData>[0],
+    );
+    const { suppressed } = await applyWhitelistFilter(
+      projectPath,
+      normalizeSecuritySource(data),
+    );
+    await persistSecurityReport(
+      projectPath,
+      withSuppressed(stripSuppressed(data, suppressed), suppressed),
+    );
+  })();
 }
 
 export async function runRefactorJob(id: string, projectPath: string): Promise<void> {
@@ -216,14 +242,8 @@ export async function runSecurityJob(id: string, projectPath: string): Promise<v
       sendDomainOutcome(id, record);
       return;
     }
-    // 先落盘再上报：页面在任务落定时会读盘刷新，写盘晚于上报会读到旧报告。
-    // 映射成页面直接渲染的 SecurityScanReportData 形状（与主进程 runSecurityHandler
-    // 的 toSecurityScanReportData 同一份实现，避免两套口径）。
     if (record.report !== undefined) {
-      await persistSecurityReport(
-        projectPath,
-        toSecurityScanReportData(record.report as Parameters<typeof toSecurityScanReportData>[0]),
-      );
+      await persistSecurityOutcome(projectPath, record.report);
     }
     progress(id, 'done', t('pipeline.security.done'), 1.0);
     sendDomainOutcome(id, record);

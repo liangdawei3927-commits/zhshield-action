@@ -757,6 +757,44 @@ describe('persistDiagnosticsFromEntries whitelist 压制自检误报', () => {
     }
   });
 
+  /**
+   * 无文件定位的配置类检查也必须能命中项目级白名单。
+   *
+   * 2026-11-14 实测：KMS 检查（`security.scan.internal.key-rotation::0`）的 file 为空，
+   * 旧实现 `entry.file && isWhitelisted(...)` 直接短路，`whitelist.project`
+   * （本就不需要文件）永远不命中 —— 项目级接受风险声明形同虚设。
+   */
+  it('file 为空的条目也能被项目级白名单豁免', async () => {
+    const project = mkdtempSync(join(tmpdir(), 'zh-wl-empty-file-'));
+    try {
+      mkdirSync(join(project, '.zhshield'), { recursive: true });
+      writeFileSync(
+        join(project, '.zhshield', 'whitelist.yml'),
+        [
+          'whitelist:',
+          '  project:',
+          '    - rule: "security.scan.internal.key-rotation"',
+          '      reason: "本项目不接入 KMS，接受风险"',
+          '      expiresAt: "2030-01-01T00:00:00Z"',
+        ].join('\n'),
+      );
+      const absPath = await persistDiagnosticsFromEntries(
+        project,
+        [
+          entry('security.scan.internal.key-rotation::0', '', undefined),
+          entry('security.scan.internal.other::0', '', undefined),
+        ],
+        ['security'],
+      );
+      const parsed = JSON.parse(readFileSync(absPath, 'utf-8'));
+      expect(parsed.issues.map((i: { ruleId: string }) => i.ruleId)).toEqual([
+        'security.scan.internal.other::0',
+      ]);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
   it('无 whitelist.yml 时不过滤任何条目（保持原行为）', async () => {
     const project = mkdtempSync(join(tmpdir(), 'zh-wl-none-'));
     try {

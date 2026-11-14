@@ -1,10 +1,8 @@
 import { useT } from '../i18n';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { FeatureIcon, LockKeyIcon } from '../components/ui/Icons';
-import { buildPlannedCapabilities } from '../components/business/capability-features';
 import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { scanRunProps } from '../components/business/ScanEmptyState';
-import { SECURITY_PLANNED_DESCRIPTIONS } from './security-logic';
 
 /**
  * 能力图标表（按能力 id 绑定）：注册表决定**渲染哪几项**，图标只负责视觉。
@@ -71,8 +69,6 @@ const SECURITY_CAPABILITY_ICONS = {
     </FeatureIcon>
   ),
 } as const;
-
-/** 规划中/已移交项的用户可读说明：与报告页共用同一份（见 security-logic） */
 
 /** 上一次「检查」失败时不能静默：页面上还挂着旧分数，用户会以为刚查过 */
 function SecurityScanErrorNotice({ error }: { error: string }) {
@@ -147,7 +143,6 @@ export function SecurityEmptyState(
       subtitle={t('page.security.empty.subtitle')}
       extra={extra}
       features={features}
-      planned={buildPlannedCapabilities('security', SECURITY_PLANNED_DESCRIPTIONS)}
       buttonText={t('page.security.fixAll')}
       onAction={props.onScan}
       actionDomain="security"

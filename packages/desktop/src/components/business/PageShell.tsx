@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { EntryCard } from '../ui/EntryCard';
 import { SecondaryButton } from '../ui/SecondaryButton';
@@ -33,13 +32,6 @@ interface PageShellProps {
   actionDomain: ActionRunningKey;
   /** 功能清单：这个页面能做什么 */
   featureList?: FeatureItem[];
-  /**
-   * 「规划中 / 已移交」能力（未实现，UI 不得宣称）。
-   *
-   * 由能力注册表的 unmet 项派生，仅供**告知**——渲染在独立灰显区，
-   * 绝不并入 featureList 网格（那会变成宣称未实现的能力）。
-   */
-  plannedFeatures?: { title: string; desc: string; badge: string }[];
   /** 底部自定义插槽（替代 featureList 网格） */
   footer?: ReactNode;
   /** 底部卡片网格列数（默认 4） */
@@ -72,51 +64,6 @@ interface PageShellProps {
   onSecondary?: () => void;
   /** 副操作是否禁用（默认跟随 loading） */
   secondaryDisabled?: boolean;
-}
-
-/**
- * 「能力边界」灰显区：未实现 / 已移交的能力只告知、不宣称，不并入功能网格。
- *
- * 2026-11-11 两处调整（用户反馈：一切正常时这块像是「还有东西没做完」的提示）：
- *  · 标题从「规划中（未实现，暂不宣称）」改为「能力边界说明」——原标题把
- *    「已移交」也罩在「规划中」下，两类状态混在一起读，且与扫描状态无关；
- *  · 默认折叠：这是静态能力说明，不该和扫描结果抢注意力，但必须保留可发现性
- *    （删掉等于页面隐含宣称覆盖了未实现/已移交的能力，这是明令禁止的）。
- */
-function PlannedList({ items }: { items: NonNullable<PageShellProps['plannedFeatures']> }) {
-  const [open, setOpen] = useState(false);
-  if (items.length === 0) return null;
-  return (
-    <div className="w-full max-w-2xl px-6 pb-10" data-testid="planned-capabilities">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        className="mx-auto flex items-center gap-1.5 text-xs font-medium text-zh-muted transition-colors hover:text-zh-ink-2"
-      >
-        能力边界说明（{items.length} 项：未实现 / 已移交）
-        <span className="text-[11px] text-zh-muted/70">{open ? '收起' : '展开'}</span>
-      </button>
-      {open && (
-        <>
-          <p className="mb-2 mt-2 text-center text-[11px] text-zh-muted/70">
-            仅为告知：以下能力本页不宣称、不产出结论。
-          </p>
-          <ul className="flex flex-col gap-1.5">
-            {items.map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-[11px] text-zh-muted">
-                <span className="shrink-0 mt-0.5 px-1.5 py-0.5 rounded bg-zh-panel">
-                  {item.badge}
-                </span>
-                <span className="shrink-0 font-medium text-zh-ink-2/70">{item.title}</span>
-                <span className="flex-1 min-w-0 text-zh-muted/80">{item.desc}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
 }
 
 /** 底部功能清单 — 全站统一贴底卡片网格（EntryCard md，列数可配置） */
@@ -290,7 +237,6 @@ export function PageShell({
   onAction,
   actionDomain,
   featureList,
-  plannedFeatures,
   footer,
   columns = 4,
   loading = false,
@@ -331,7 +277,6 @@ export function PageShell({
       {featureList && featureList.length > 0 && (
         <FeatureList features={featureList} columns={columns} />
       )}
-      {plannedFeatures && plannedFeatures.length > 0 && <PlannedList items={plannedFeatures} />}
     </div>
   );
 }

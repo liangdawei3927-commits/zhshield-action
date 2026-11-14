@@ -24,10 +24,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { implementedCapabilities, unimplementedCapabilities } from '@zh/shared';
 import type { DomainId } from '@zh/shared';
 
-import {
-  buildCapabilityFeatures,
-  buildPlannedCapabilities,
-} from '../components/business/capability-features';
+import { buildCapabilityFeatures } from '../components/business/capability-features';
 
 /** 各域已接入注册表的空态页 */
 const WIRED_DOMAINS: DomainId[] = ['inspect', 'security', 'garbage', 'performance', 'refactor'];
@@ -144,40 +141,5 @@ describe('能力清单渲染 — 展示质量', () => {
       </ul>,
     );
     expect(html).not.toContain('undefined');
-  });
-});
-
-describe('能力清单渲染 — 规划中清单（未实现，仅告知，不宣称）', () => {
-  it.each(WIRED_DOMAINS)('%s 域 planned 清单与注册表未实现能力一一对应', (domain) => {
-    const expected = unimplementedCapabilities(domain).map((c) => c.id);
-    const planned = buildPlannedCapabilities(domain).map((p) => p.id);
-    expect(planned).toEqual(expected);
-  });
-
-  it.each(WIRED_DOMAINS)('%s 域 planned 与已实现能力不重叠（不重复宣称）', (domain) => {
-    const impl = new Set(implementedCapabilities(domain).map((c) => c.id));
-    for (const p of buildPlannedCapabilities(domain)) {
-      expect(impl.has(p.id), `${domain}/${p.id} 同时出现在已实现与规划中`).toBe(false);
-    }
-  });
-
-  it.each(WIRED_DOMAINS)('%s 域 planned 项标题与说明均非空', (domain) => {
-    for (const p of buildPlannedCapabilities(domain)) {
-      expect(p.title, `${domain}/${p.id} 缺标题`).toBeTruthy();
-      expect(p.desc, `${domain}/${p.id} 缺说明`).toBeTruthy();
-    }
-  });
-
-  it('性能域 planned 不再含 ReDoS，仍含现代化 API / 定时器', () => {
-    const ids = buildPlannedCapabilities('performance').map((p) => p.id);
-    expect(ids).not.toContain('performance.redos');
-    expect(ids).toContain('performance.modern-api');
-    expect(ids).toContain('performance.timer');
-  });
-
-  it('安全域「规范检查」与「依赖检查」均为已移交', () => {
-    const byId = Object.fromEntries(buildPlannedCapabilities('security').map((p) => [p.id, p]));
-    expect(byId['security.standard']?.status).toBe('deprecated');
-    expect(byId['security.dependency']?.status).toBe('deprecated');
   });
 });

@@ -1,27 +1,20 @@
 import type { ComponentProps } from 'react';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
+import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { FeatureIcon, LayersGlyph, GridGlyph } from '../components/ui/Icons';
-import {
-  buildCapabilityFeatures,
-  buildPlannedCapabilities,
-} from '../components/business/capability-features';
+import { buildCapabilityFeatures } from '../components/business/capability-features';
 import { useT } from '../i18n';
 
-interface EmptyStateProps {
-  projectPath: string;
+/**
+ * 空态 props：运行态字段（loading / progress / statusMessage / queued /
+ * queuePosition / onCancel / stopping / onScan）复用全仓统一的空态契约
+ * {@link ScanEmptyStateParams}，本域只补自己的 `error`。
+ *
+ * 此前这里把 8 个字段逐行重抄一遍，与 guard / inspect 的空态声明构成跨文件重复；
+ * 该契约加字段时这几份手抄版会静默落后（`statusMessage` 改名那轮就差点漏）。
+ */
+interface EmptyStateProps extends ScanEmptyStateParams {
   error: string;
-  loading: boolean;
-  /** 扫描进度 0..1（与任务中心 TaskInfo.progress 同源） */
-  progress?: number;
-  statusMessage?: string;
-  /** 任务已入队但还没真正开始（按钮显示「排队中…」） */
-  queued?: boolean;
-  queuePosition?: number;
-  /** 停止本次重构扫描（运行/排队时按钮旁出现「停止」） */
-  onCancel: () => void;
-  /** 已发出取消、等确认 */
-  stopping: boolean;
-  onScan: () => void;
 }
 
 /** 构建重构空态的特色说明列表 */
@@ -30,8 +23,8 @@ function buildRefactorFeatures(
 ): ComponentProps<typeof DomainEmptyView>['features'] {
   // 注册表决定**渲染哪几项**（只渲染 status='implemented' 的）。
   // 「一键应用推荐重构方案」（refactor.auto-fix）现已落地（2026-11-03）：
-  // 桌面端入口 + 写盘前自动备份。其余种类的能力若仍是 planned/deprecated，
-  // 会自动落到下方「规划中」灰显区，不会混进这里。
+  // 桌面端入口 + 写盘前自动备份。注册表里 status 仍是 planned/deprecated 的
+  // 能力不会出现在这里（空态也不再单列「能力边界」区）。
   // 「每日自动检查」「按类别分组」是运行形态而非检测能力，由页面自身承载，不入注册表。
   return buildCapabilityFeatures('refactor', {
     icons: {
@@ -69,7 +62,6 @@ export function RefactorEmptyState(props: EmptyStateProps) {
         title={t('page.refactor.shell.title')}
         subtitle={t('page.refactor.shell.subtitle')}
         features={buildRefactorFeatures(t)}
-        planned={buildPlannedCapabilities('refactor')}
         buttonText={t('page.refactor.scanNow')}
         onAction={props.onScan}
         actionDomain="refactor"

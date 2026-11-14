@@ -4,10 +4,7 @@ import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { NavGlyph } from '../components/business/page-glyph';
 import { FeatureIcon } from '../components/ui/Icons';
 import { useT } from '../i18n';
-import {
-  buildCapabilityFeatures,
-  buildPlannedCapabilities,
-} from '../components/business/capability-features';
+import { buildCapabilityFeatures } from '../components/business/capability-features';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { useDomainDetailPage } from '../hooks/useDomainDetailEntry';
 import { DomainSnapshotReport } from '../components/business/DomainSnapshotReport';
@@ -250,7 +247,6 @@ function PerformanceEmptyView({
           ),
         },
       })}
-      planned={buildPlannedCapabilities('performance')}
       buttonText={t('page.performance.shell.start')}
       onAction={onAction}
       queued={queued}

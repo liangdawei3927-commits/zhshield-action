@@ -29,8 +29,8 @@
 
 import type { ReactNode } from 'react';
 
-import { implementedCapabilities, unimplementedCapabilities } from '@zh/shared';
-import type { CapabilityDeclaration, CapabilityStatus, DomainId } from '@zh/shared';
+import { implementedCapabilities } from '@zh/shared';
+import type { CapabilityDeclaration, DomainId } from '@zh/shared';
 
 /** 单个能力的展示项（icon 由调用方提供 —— 图标是纯视觉，不进注册表） */
 export interface CapabilityFeatureItem {
@@ -68,49 +68,5 @@ export function buildCapabilityFeatures(
     title: cap.label,
     desc: source.descriptions?.[cap.id] ?? cap.label,
     icon: source.icons[cap.id] ?? <span key={cap.id} />,
-  }));
-}
-
-/** 「规划中 / 已移交」能力展示项：UI **不得**把它们当作可宣称能力渲染 */
-export interface CapabilityPlannedItem {
-  /** 能力 id */
-  id: string;
-  /** 能力名（注册表 label） */
-  title: string;
-  /** 未实现原因（注册表 note，缺省给一句话兜底） */
-  desc: string;
-  /** 状态：planned（尚未实现）/ deprecated（已移交他域） */
-  status: Exclude<CapabilityStatus, 'implemented'>;
-}
-
-/**
- * 取某域**未实现**的能力（planned / deprecated），供空态以「规划中（不宣称）」灰显区展示。
- *
- * 与 {@link buildCapabilityFeatures}（只给已实现）互补：这条路径让用户也能看见
- * 「这个域宣称过、但当前不做/暂未做」的清单 —— 此前这份清单只有 CLI
- * （`zhshield capability` / `--format json`）能看到，桌面端看不到。
- *
- * 它**不是**可宣称能力：渲染层必须把它放在独立的「规划中」区，绝不能并入功能网格。
- *
- * ## 为什么要有 `descriptions` 覆盖
- *
- * 注册表的 `note` 是**写给维护者看的**（含《07》条目号、"全仓无对应实现"、
- * "本页不得宣称"这类工艺术语）。它直接渲染会把这些内部注记暴露给用户
- * （2026-11-09 实锤：安全页「已移交」区把 `按《07》O2 / O10…` 原样展示）。
- * 调用方用本参数提供面向用户的说明；缺省才退回 note（CLI/文档仍可用原文）。
- */
-export function buildPlannedCapabilities(
-  domain: DomainId,
-  descriptions?: Readonly<Record<string, string>>,
-): CapabilityPlannedItem[] {
-  return unimplementedCapabilities(domain).map((cap) => ({
-    id: cap.id,
-    title: cap.label,
-    desc:
-      descriptions?.[cap.id] ??
-      cap.note ??
-      (cap.status === 'deprecated' ? '已移交其他治理域，本域不再宣称' : '规划中：尚未实现'),
-    // unimplementedCapabilities 只返回非 implemented 项，此处收窄类型
-    status: cap.status as Exclude<CapabilityStatus, 'implemented'>,
   }));
 }

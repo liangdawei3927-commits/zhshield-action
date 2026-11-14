@@ -46,13 +46,6 @@ describe('合规基线归安全中心', () => {
     expect(securityPage).toContain('<ComplianceBaselineSection');
   });
 
-  it('能力边界只在主页底部呈现，详情页不重复展示', () => {
-    // 首次进入、尚未扫描时也要能看见“本页不覆盖什么”
-    expect(securityEmptyState).toContain('planned=');
-    // 详情页不再重复展示同一份边界
-    expect(reportParts).not.toContain('<SecurityNotCovered');
-  });
-
   it('项目体检不再渲染合规基线，也不消费安全域证据', () => {
     expect(inspectPage).not.toContain('ComplianceBaselineSection');
     expect(inspectPage).not.toContain('evaluateComplianceBaseline');

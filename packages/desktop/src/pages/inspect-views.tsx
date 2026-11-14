@@ -7,11 +7,9 @@
 import { PageShell } from '../components/business/PageShell';
 import { DomainScoreRing } from '../components/business/DomainScoreRing';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
+import type { ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { FeatureIcon, GridGlyph } from '../components/ui/Icons';
-import {
-  buildCapabilityFeatures,
-  buildPlannedCapabilities,
-} from '../components/business/capability-features';
+import { buildCapabilityFeatures } from '../components/business/capability-features';
 import type { InspectFailure } from './inspect-sop-mapper';
 
 export type Translate = (key: string, params?: Record<string, unknown>) => string;
@@ -119,20 +117,14 @@ export function InspectFailureView({
   );
 }
 
-/** 空态：引导发起体检 */
-export function InspectEmptyView(props: {
-  projectPath: string;
-  loading: boolean;
-  progress: number;
-  statusMessage: string;
-  queued?: boolean;
-  queuePosition?: number;
-  /** 停止本次体检 */
-  onCancel: () => void;
-  stopping: boolean;
-  onScan: () => void;
-  t: Translate;
-}) {
+/**
+ * 空态：引导发起体检。
+ *
+ * props 的运行态字段（loading / progress / statusMessage / queued / queuePosition /
+ * onCancel / stopping / onScan）复用全仓统一的空态契约 {@link ScanEmptyStateParams}，
+ * 本域只补 `t`；此前这里逐行重抄了同一组字段，与 guard / refactor 的空态声明重复。
+ */
+export function InspectEmptyView(props: ScanEmptyStateParams & { t: Translate }) {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
@@ -155,7 +147,6 @@ export function InspectEmptyView(props: {
           'inspect.code-style': props.t('page.inspect.feature.codeStyle.desc'),
         },
       })}
-      planned={buildPlannedCapabilities('inspect')}
       buttonText={props.t('page.inspect.scanNow')}
       onAction={props.onScan}
       actionDomain="inspect"

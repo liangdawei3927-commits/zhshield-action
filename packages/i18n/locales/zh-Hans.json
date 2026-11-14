@@ -1738,7 +1738,8 @@
       },
       "stats": {
         "total": "总漏洞",
-        "malware": "恶意代码"
+        "malware": "恶意代码",
+        "suppressed": "已豁免"
       },
       "degraded": {
         "title": "本次扫描已降级，结果可能不完整",
@@ -1748,7 +1749,9 @@
       "skipped": {
         "title": "以下检查本次不适用，已跳过",
         "detail": "{{tools}}：当前项目不满足适用前提（如缺少 package.json），属预期裁剪，非工具故障，无需处理。"
-      }
+      },
+      "suppressedHint": "以下条目已由白名单接受风险，不计入评分；理由/责任人/到期见各行",
+      "suppressedMeta": "理由：{{reason}} · 认领：{{operator}} · 到期：{{expires}}"
     },
     "sentinel": {
       "aiFixSource": "哨兵·监控",

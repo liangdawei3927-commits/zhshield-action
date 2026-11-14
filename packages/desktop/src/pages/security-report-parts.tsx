@@ -8,10 +8,15 @@
  * 把接线搬走等于绕过守卫。
  *
  * 分类明细经 `children` 插槽传入，渲染位置与拆分前完全一致（标签栏之下）。
+ *
+ * 规则通道横幅（账本分类 + 三类提示条）已再拆至 `security-rule-channel.tsx`：
+ * 本文件二次越过 400 行阈值（zhcheck oversized-file），而横幅只依赖报告里的
+ * `ruleChannel` / `ruleLedger`，与统计卡、分类面板无耦合。
  */
 
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
+import { classifyRuleLedger, RuleLedgerList, type RuleLedgerEntry } from './security-rule-channel';
 import { FindingsPanel, MalwarePanel } from './security-parts';
 import { DomainReportShell } from '../components/business/domain-report-shell';
 import type { ReportStatCard } from '../components/business/ReportShell';
@@ -143,8 +148,54 @@ function buildRuleStatusCards(report: SecurityScanReportData, t: Translate): Rep
 }
 
 /**
+ * 豁免卡：被白名单接受的已知问题（不计分，但必须可见）。
+ *
+ * 为什么不静默丢弃：豁免与「漏报」在界面上长得一模一样，只给一个少了几条的
+ * 列表，用户分不清是「查过且放过」还是「没查出来」。卡片给出计数，展开后逐条
+ * 显示理由 / 责任人 / 到期日——这才是「接受风险」和「假装看不见」的分界。
+ */
+function buildSuppressedCard(report: SecurityScanReportData, t: Translate): ReportStatCard[] {
+  const suppressed = report.suppressed ?? [];
+  if (suppressed.length === 0) return [];
+  return [
+    {
+      key: 'suppressed',
+      label: t('page.security.stats.suppressed', { defaultValue: '已豁免' }),
+      value: suppressed.length,
+      color: 'rgb(var(--zh-muted))',
+      detail: {
+        items: suppressed,
+        hint: t('page.security.suppressedHint', {
+          defaultValue: '以下条目已由白名单接受风险，不计入评分；理由/责任人/到期见各行',
+        }),
+        render: (sub: unknown[]) => (
+          <ul className="space-y-2" data-testid="security-stat-suppressed">
+            {(sub as NonNullable<SecurityScanReportData['suppressed']>).map((item) => (
+              <li key={`${item.ruleId}:${item.message}`} className="text-xs">
+                <div className="font-medium text-zh-ink break-all">{item.message}</div>
+                <div className="mt-0.5 text-zh-muted break-all">
+                  {t('page.security.suppressedMeta', {
+                    defaultValue: '理由：{{reason}} · 认领：{{operator}} · 到期：{{expires}}',
+                    reason: item.reason || '—',
+                    operator: item.operator || '—',
+                    expires: item.expiresAt ? item.expiresAt.slice(0, 10) : '永久',
+                  })}
+                </div>
+                <div className="mt-0.5 font-mono text-[11px] break-all text-zh-muted">
+                  {item.ruleId}
+                </div>
+              </li>
+            ))}
+          </ul>
+        ),
+      },
+    },
+  ];
+}
+
+/**
  * 报告统计卡：本次扫描的**全部问题**（漏洞 + 恶意代码 + 活跃密钥）按严重度汇总，
- * 外加规则通道的两个状态计数（未评估 / 跳过）。
+ * 外加规则通道的两个状态计数（未评估 / 跳过）与白名单豁免计数。
  *
  * 与其他分区详情页保持一致：卡片是**固定一套**（0 也显示），不随问题数增减；
  * 规则状态在卡内可展开逐条，不再用整幅横幅压住正文。
@@ -167,6 +218,7 @@ export function buildSecurityStats({
     },
     ...buildSeverityCards(severities, t),
     ...buildRuleStatusCards(report, t),
+    ...buildSuppressedCard(report, t),
   ];
 }
 
@@ -194,150 +246,6 @@ export interface SecurityReportViewProps extends SecurityReportCopyProps, AsyncS
   secretsReport?: SecretReportData | null;
 }
 
-/**
- * 规则通道求值账横幅：有规则没评估成 → 0 检出 ≠ 干净。
- *
- * 与工具级 {@link SecurityDegradedBanner} 分开：这里是「规则没能评估」
- * （规则通道未执行 / 规则降级），不是工具不可用。混在一起会让用户按
- * 「重装工具」去修一个其实是规则/项目前提的问题。
- */
-/** 账本条目类型（从报告类型派生，避免第二份形状定义） */
-type RuleLedgerEntry = NonNullable<SecurityScanReportData['ruleLedger']>[number];
-
-/**
- * 把账本分成页面上的两个桶：未能评估 / 按项目前提跳过。
- *
- * 纯函数：判定规则只有一处，渲染层不再各自 filter（否则两处口径迟早分叉）。
- */
-export function classifyRuleLedger(ledger: readonly RuleLedgerEntry[]): {
-  failed: RuleLedgerEntry[];
-  skipped: RuleLedgerEntry[];
-} {
-  const failed = ledger.filter((entry) => entry.status === 'error' || entry.degraded === true);
-  const skipped = ledger.filter((entry) => entry.status === 'skipped' && entry.degraded !== true);
-  return { failed, skipped };
-}
-
-/** 逐条规则明细列表（两个桶共用；颜色与测试标记由调用方给） */
-function RuleLedgerList({
-  entries,
-  tone,
-  testId,
-}: {
-  entries: readonly RuleLedgerEntry[];
-  tone: string;
-  testId: string;
-}) {
-  if (entries.length === 0) return null;
-  return (
-    <ul className="mt-1.5 space-y-1">
-      {entries.map((entry, index) => (
-        <li key={`${entry.ruleId}-${index}`} className={`text-xs ${tone} break-all`} data-testid={testId}>
-          <span className="font-medium">{entry.ruleId}</span>
-          {entry.reason ? ` — ${entry.reason}` : ''}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** 通道未执行：danger 条（只跑启发式时 0 检出 ≠ 干净） */
-function ChannelNotRunNotice({ t }: { t: Translate }) {
-  return (
-    <div className="px-4 py-3 rounded-xl bg-danger-50 border border-danger-100">
-      <div className="text-xs text-danger-700">
-        {t('page.security.result.ruleChannelNotRun', {
-          defaultValue:
-            '规则通道本次未执行：只跑了启发式通道，0 检出不代表代码干净。请查看扫描日志确认规则集是否加载失败。',
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** 未能评估：warning 条 + 逐条原因（默认折叠，旧报告无明细时明确标注，不冒充完整） */
-function DegradedRulesNotice({
-  count,
-  entries,
-  t,
-}: {
-  count: number;
-  entries: readonly RuleLedgerEntry[];
-  t: Translate;
-}) {
-  return (
-    <details className="px-4 py-2 rounded-xl bg-warning-50 border border-warning-100">
-      <summary className="cursor-pointer text-xs font-medium text-warning-700">
-        {t('page.security.result.ruleChannelDegradedSummary', {
-          defaultValue: '{{count}} 条规则未能评估——未检测不等于通过。',
-          count,
-        })}
-      </summary>
-      <div className="mt-1 text-[11px] text-warning-600">
-        {t('page.security.result.ruleChannelDegradedHint', {
-          defaultValue: '逐条原因见下，可据此判断是缺工具、缺适配器，还是规则本身跑不成。',
-        })}
-      </div>
-      {entries.length > 0 ? (
-        <RuleLedgerList entries={entries} tone="text-warning-600" testId="security-rule-degraded" />
-      ) : (
-        <div className="mt-1 text-xs text-warning-500">
-          {t('page.security.result.ruleChannelNoLedger', {
-            defaultValue: '逐条明细未知（该报告由旧版本产出）。',
-          })}
-        </div>
-      )}
-    </details>
-  );
-}
-
-/** 按项目前提跳过：中性条、默认折叠（既定裁剪 ≠ 故障，重装工具对它无效） */
-function SkippedRulesNotice({
-  count,
-  entries,
-  t,
-}: {
-  count: number;
-  entries: readonly RuleLedgerEntry[];
-  t: Translate;
-}) {
-  return (
-    <details className="px-4 py-2 rounded-xl bg-info-50 border border-info-100">
-      <summary className="text-xs text-info-700 cursor-pointer">
-        {t('page.security.result.ruleChannelSkipped', {
-          defaultValue: '{{count}} 条规则按项目前提跳过（本项目不适用，不是故障）。',
-          count,
-        })}
-      </summary>
-      <RuleLedgerList entries={entries} tone="text-info-500" testId="security-rule-skipped" />
-    </details>
-  );
-}
-
-export function SecurityRuleChannelBanner({
-  report,
-  t,
-}: {
-  report: SecurityScanReportData;
-  t: Translate;
-}) {
-  const channel = report.ruleChannel;
-  const ledger = report.ruleLedger ?? [];
-  const hasLedger = ledger.length > 0;
-  const { failed, skipped } = classifyRuleLedger(ledger);
-  const degradedCount = hasLedger ? failed.length : (channel?.degraded ?? 0);
-  const skippedCount = hasLedger ? skipped.length : (channel?.skipped ?? 0);
-  if (!channel && !hasLedger) return null;
-  if (channel?.ran !== false && degradedCount === 0 && skippedCount === 0) return null;
-
-  return (
-    <div className="mb-3 space-y-1.5">
-      {channel?.ran === false ? <ChannelNotRunNotice t={t} /> : null}
-      {degradedCount > 0 ? <DegradedRulesNotice count={degradedCount} entries={failed} t={t} /> : null}
-      {skippedCount > 0 ? <SkippedRulesNotice count={skippedCount} entries={skipped} t={t} /> : null}
-    </div>
-  );
-}
 
 /**
  * P1-4：扫描降级横幅——工具不可用/审计失败时 0 检出 ≠ 安全，必须显形。

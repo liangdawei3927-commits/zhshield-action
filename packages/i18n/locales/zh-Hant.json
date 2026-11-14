@@ -1660,7 +1660,8 @@
       },
       "stats": {
         "total": "總漏洞",
-        "malware": "惡意程式碼"
+        "malware": "惡意程式碼",
+        "suppressed": "已豁免"
       },
       "degraded": {
         "title": "本次掃描已降級，結果可能不完整",
@@ -1670,7 +1671,9 @@
       "skipped": {
         "title": "以下檢查本次不適用，已跳過",
         "detail": "{{tools}}：目前專案未滿足適用前提（如缺少 package.json），屬預期裁減，非工具故障，無需處理。"
-      }
+      },
+      "suppressedHint": "以下條目已由白名單接受風險，不計入評分；理由/負責人/到期見各行",
+      "suppressedMeta": "理由：{{reason}} · 認領：{{operator}} · 到期：{{expires}}"
     },
     "sentinel": {
       "aiFixSource": "哨兵·監控",

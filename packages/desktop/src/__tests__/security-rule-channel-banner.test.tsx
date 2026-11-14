@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { SecurityRuleChannelBanner } from '../pages/security-report-parts';
+import { SecurityRuleChannelBanner } from '../pages/security-rule-channel';
 import type { SecurityScanReportData } from '../types/electron';
 
 /**

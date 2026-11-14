@@ -1738,7 +1738,8 @@
       },
       "stats": {
         "total": "Vulnerabilities",
-        "malware": "Malware"
+        "malware": "Malware",
+        "suppressed": "Waived"
       },
       "degraded": {
         "title": "Scan degraded; results may be incomplete",
@@ -1748,7 +1749,9 @@
       "skipped": {
         "title": "Not applicable to this project; skipped",
         "detail": "{{tools}}: this project does not meet the prerequisites (e.g. missing package.json). Expected trimming, not a tool failure — no action needed."
-      }
+      },
+      "suppressedHint": "These findings are accepted as risk via the whitelist and excluded from scoring; see reason/owner/expiry per row",
+      "suppressedMeta": "Reason: {{reason}} · Owner: {{operator}} · Expires: {{expires}}"
     },
     "sentinel": {
       "aiFixSource": "Sentinel · Monitor",

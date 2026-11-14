@@ -1660,7 +1660,8 @@
       },
       "stats": {
         "total": "総脆弱性",
-        "malware": "マルウェア"
+        "malware": "マルウェア",
+        "suppressed": "除外済み"
       },
       "degraded": {
         "title": "スキャンが縮退したため、結果は不完全な可能性があります",
@@ -1670,7 +1671,9 @@
       "skipped": {
         "title": "今回の検査は対象外のためスキップしました",
         "detail": "{{tools}}: このプロジェクトは適用前提を満たしていません（package.json が無い等）。想定された除外であり、ツールの故障ではありません。対応は不要です。"
-      }
+      },
+      "suppressedHint": "以下の項目はホワイトリストによりリスク許容され、スコアに含まれません。理由/担当/期限は各行を参照",
+      "suppressedMeta": "理由：{{reason}} · 担当：{{operator}} · 期限：{{expires}}"
     },
     "sentinel": {
       "aiFixSource": "センチネル・監視",

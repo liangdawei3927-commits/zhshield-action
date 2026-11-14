@@ -52,6 +52,16 @@ const SECTION_PARSERS: Record<WhitelistSection, (ctx: LineParseContext) => void>
   rule: parseRuleLine,
 };
 
+/**
+ * 理由是否有效：非空白即有效（不做长度 / 措辞校验）。
+ *
+ * 只挡「没写」这一种情况，不评价写得好不好 —— 判定理由质量需要语义理解，
+ * 机器做不到，做不好就成了形式主义的字符数门槛。
+ */
+function hasReason(reason: string | undefined): boolean {
+  return typeof reason === 'string' && reason.trim().length > 0;
+}
+
 /** 解析 YAML-like 白名单内容为 WhitelistEntry 列表 */
 function parseWhitelistYaml(content: string): WhitelistEntry[] {
   const config: WhitelistConfig = { whitelist: {} };
@@ -265,6 +275,11 @@ export class WhitelistManager {
   }
 
   async add(entry: Omit<WhitelistEntry, 'id' | 'createdAt'>): Promise<WhitelistEntry> {
+    // 写入侧同样挡空理由：只读侧跳过会让这类条目「写进去了但永远不生效」，
+    // 用户以为已经豁免、实际没有，比直接拒绝更坑。
+    if (!hasReason(entry.reason)) {
+      throw new Error('白名单条目必须填写理由（reason）：豁免需要留下接受风险的依据');
+    }
     const newEntry: WhitelistEntry = {
       ...entry,
       id: randomUUID(),
@@ -289,6 +304,10 @@ export class WhitelistManager {
   ): { whitelisted: boolean; entry?: WhitelistEntry } {
     for (const entry of this.entries) {
       if (entry.expiresAt && new Date(entry.expiresAt) < new Date()) continue;
+      // 无理由的条目一律不生效：豁免的语义是「评估后接受风险」，而理由就是那份
+      // 评估记录。空理由的条目不是豁免，是「把报警关掉」——两者在配置文件里长得
+      // 一样，只差一个字符串。宁可不生效（暴露为问题），也不给它静默通过的通道。
+      if (!hasReason(entry.reason)) continue;
 
       if (
         this.matchesRuleEntry(entry, ruleId, filePath) ||
@@ -314,9 +333,22 @@ export class WhitelistManager {
     return !entry.ruleId || entry.ruleId === ruleId || entry.ruleId === '*';
   }
 
-  /** 项目级白名单匹配：ruleId 一致即命中 */
+  /**
+   * 项目级白名单匹配：按**规则身份**命中，不要求实例 id 完全相等。
+   *
+   * 命中两种形态：
+   *   1. `ruleId` 与配置完全一致（规则 id 直接透传的场景）；
+   *   2. `ruleId` 以 `<配置 id>:` 开头 —— 诊断条目常把实例位置拼进 id
+   *      （`security.scan.internal.key-rotation::0` 即 `ruleId:file:line`），
+   *      此时配置写稳定的规则 id 即可，不该被迫跟着行号漂移。
+   *
+   * 为什么这样放宽：项目级豁免的语义是「本项目接受该规则报出的风险」，对象是
+   * **规则**而非某一行。若要求全等，用户每挪一次代码豁免就失效，条目腐化后
+   * 没人会发现——那比不豁免更危险。
+   */
   private matchesProjectEntry(entry: WhitelistEntry, ruleId: string): boolean {
-    return entry.scope === 'project' && entry.ruleId === ruleId;
+    if (entry.scope !== 'project' || !entry.ruleId) return false;
+    return ruleId === entry.ruleId || ruleId.startsWith(`${entry.ruleId}:`);
   }
 
   list(projectId?: string): WhitelistEntry[] {

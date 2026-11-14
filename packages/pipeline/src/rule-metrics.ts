@@ -256,26 +256,45 @@ interface CollectResult {
   oversize: string[];
 }
 
+/** 遍历过程中的共享状态：调用栈、结果容器与采集口径，避免逐层传参 */
+interface CollectContext {
+  repoRoot: string;
+  limit: number;
+  stack: string[];
+  result: CollectResult;
+}
+
 function collectSourceFiles(repoRoot: string, limit: number): CollectResult {
   const result: CollectResult = { paths: [], truncated: false, oversize: [] };
   const stack = [repoRoot];
+  const ctx: CollectContext = { repoRoot, limit, stack, result };
   while (stack.length > 0 && !result.truncated) {
-    const dir = stack.pop() as string;
-    for (const entry of readDir(dir)) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        // 嵌套仓库不算本项目的源码：项目级指标跨仓库统计既挂错项目，也绕过对方基线
-        if (!isSkippedDir(entry.name) && !isNestedRepoRoot(full)) stack.push(full);
-        continue;
-      }
-      if (!acceptSourceFile(repoRoot, full, entry.name, result.oversize)) continue;
-      result.paths.push(full);
-      // 截断必须显式标记：静默少算会让复杂度指标偏低，等于喂假数据
-      result.truncated = result.paths.length > limit;
-      if (result.truncated) break;
-    }
+    scanDir(stack.pop() as string, ctx);
   }
   return result;
+}
+
+/** 扫描单个目录：子目录入栈、源文件计入结果；达到上限即标记截断并停止遍历 */
+function scanDir(dir: string, ctx: CollectContext): void {
+  for (const entry of readDir(dir)) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      pushChildDir(entry.name, full, ctx.stack);
+      continue;
+    }
+    if (!acceptSourceFile(ctx.repoRoot, full, entry.name, ctx.result.oversize)) continue;
+    ctx.result.paths.push(full);
+    // 截断必须显式标记：静默少算会让复杂度指标偏低，等于喂假数据
+    ctx.result.truncated = ctx.result.paths.length > ctx.limit;
+    if (ctx.result.truncated) return;
+  }
+}
+
+/** 子目录是否入栈待扫（guard clause：跳过构建产物/依赖目录与嵌套仓库） */
+function pushChildDir(name: string, full: string, stack: string[]): void {
+  // 嵌套仓库不算本项目的源码：项目级指标跨仓库统计既挂错项目，也绕过对方基线
+  if (isSkippedDir(name) || isNestedRepoRoot(full)) return;
+  stack.push(full);
 }
 
 function readDir(dir: string): fs.Dirent[] {

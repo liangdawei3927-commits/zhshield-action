@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: a692b6cf81bec3a8
+// @zh-src-hash: a7726fe75d850ae6
 // @zh-src-files: 431
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -519250,21 +519250,28 @@ function countLines(text) {
 function collectSourceFiles2(repoRoot, limit) {
   const result = { paths: [], truncated: false, oversize: [] };
   const stack = [repoRoot];
+  const ctx = { repoRoot, limit, stack, result };
   while (stack.length > 0 && !result.truncated) {
-    const dir2 = stack.pop();
-    for (const entry of readDir(dir2)) {
-      const full = path50.join(dir2, entry.name);
-      if (entry.isDirectory()) {
-        if (!isSkippedDir(entry.name) && !isNestedRepoRoot(full)) stack.push(full);
-        continue;
-      }
-      if (!acceptSourceFile(repoRoot, full, entry.name, result.oversize)) continue;
-      result.paths.push(full);
-      result.truncated = result.paths.length > limit;
-      if (result.truncated) break;
-    }
+    scanDir(stack.pop(), ctx);
   }
   return result;
+}
+function scanDir(dir2, ctx) {
+  for (const entry of readDir(dir2)) {
+    const full = path50.join(dir2, entry.name);
+    if (entry.isDirectory()) {
+      pushChildDir(entry.name, full, ctx.stack);
+      continue;
+    }
+    if (!acceptSourceFile(ctx.repoRoot, full, entry.name, ctx.result.oversize)) continue;
+    ctx.result.paths.push(full);
+    ctx.result.truncated = ctx.result.paths.length > ctx.limit;
+    if (ctx.result.truncated) return;
+  }
+}
+function pushChildDir(name, full, stack) {
+  if (isSkippedDir(name) || isNestedRepoRoot(full)) return;
+  stack.push(full);
 }
 function readDir(dir2) {
   try {

@@ -64,7 +64,13 @@ export * from './backup/index';
 
 // ─── 通知服务 ──────────────────────────────────────────────
 export { NotificationService, notificationService } from './notification';
-export type { AppNotification, NotificationStore, NotificationListener } from './notification';
+export type {
+  AppNotification,
+  NotificationStore,
+  NotificationListener,
+  BrowserNotificationCtor,
+  BrowserNotificationStatic,
+} from './notification';
 
 // ─── 审计日志（智汇大脑 — 链式哈希完整性） ──────────────────
 export { AuditLogger } from './audit';

@@ -8,7 +8,7 @@ import {
   useState,
 } from 'react';
 import { NotificationService } from '@zh/kernel';
-import type { AppNotification } from '@zh/kernel';
+import type { AppNotification, BrowserNotificationStatic } from '@zh/kernel';
 
 // ---------------------------------------------------------------------------
 // Preferences
@@ -57,15 +57,11 @@ export const NotificationContext = createContext<NotificationContextValue | null
 // Browser permission helper (globalThis, not window)
 // ---------------------------------------------------------------------------
 
-type BrowserNotificationCtor = new (
-  title: string,
-  options?: { body?: string },
-) => { close(): void };
-type BrowserNotificationStatic = BrowserNotificationCtor & {
-  permission: string;
-  requestPermission(): Promise<string>;
-};
-
+/**
+ * 类型取自 `@zh/kernel`：主进程通知服务与渲染侧原本各写一份完全相同的
+ * BrowserNotification 类型，漂移时不会报错，只会让 `permission` /
+ * `requestPermission` 的理解悄悄分叉。
+ */
 function getBrowserNotification(): BrowserNotificationStatic | undefined {
   if (typeof globalThis === 'undefined' || !('Notification' in globalThis)) return undefined;
   return (globalThis as Record<string, unknown>).Notification as BrowserNotificationStatic;

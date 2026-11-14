@@ -1,10 +1,18 @@
 import type { AppNotification, NotificationListener, NotificationStore } from './types';
 
-type BrowserNotificationCtor = new (
+/**
+ * 浏览器 Notification API 的最小类型面（构造器 + 静态成员）。
+ *
+ * 主进程通知服务与渲染进程（`desktop/src/contexts/NotificationContext.tsx`）
+ * 各自需要同一份 DOM 全局类型；渲染侧曾照抄一份（2026-11-15 核实为逐字相同）。
+ * 类型漂移不会报错，只会让两侧对 `permission` / `requestPermission` 的理解悄悄分叉，
+ * 故统一由本模块导出。
+ */
+export type BrowserNotificationCtor = new (
   title: string,
   options?: { body?: string },
 ) => { close(): void };
-type BrowserNotificationStatic = BrowserNotificationCtor & {
+export type BrowserNotificationStatic = BrowserNotificationCtor & {
   permission: string;
   requestPermission(): Promise<string>;
 };

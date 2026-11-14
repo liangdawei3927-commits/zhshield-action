@@ -68,6 +68,33 @@ pnpm + Turborepo monorepo，21 个 `@zh/*` 包。依赖方向：客户端 → �
   ubuntu CI 比 macOS 产物会因平台差异误报，指纹只看源码内容，跨平台稳定。
 - 报错 `❌ 已提交的 CLI bundle 与当前源码不一致（产物过期）` 时：`build` 完把
   `packages/cli/dist/zhshield.js` 一起 `git add` 即可。
+- ⚠️ `pnpm verify:dist-fresh` **默认会先重建 bundle**（`build-cli.mjs`），这会覆盖工作区
+  里的 `dist/zhshield.js`。工作区有其他未提交工作时，用它做校验等于把别人的改动打进产物。
+  只做校验要加 `--no-build`。
+
+### 在干净 worktree 里构建 bundle（多会话并行时）
+
+工作区里有他人未提交的 `packages/*/src` 改动时，**不要**直接 `pnpm --filter zhshield-cli build` ——
+esbuild 会把整棵工作区源码打进产物，等于替别人做了「这些小改可以发布」的决定。正确做法是在
+`git worktree add /tmp/wt-bundle HEAD` 里构建（同「安全替代方案」表），再只把
+`packages/cli/dist/zhshield.js` 拷回工作区。
+
+**硬约束：worktree 里的 `node_modules` 必须真实安装，绝不可软链回原仓库。**
+
+```bash
+cd /tmp/wt-bundle && pnpm install --frozen-lockfile --prefer-offline   # 约 2.5 分钟
+```
+
+2026-11-14 实测：先用 `ln -s <原仓库>/node_modules`（以及 21 个子包的）复用依赖，esbuild 按
+**realpath** 解析，把 `../../../../../Users/<用户>/...` 绝对路径嵌进 bundle —— 产出 5000+ 行
+无意义 diff，并把本机 home 路径泄露进将发布给所有用户的 CLI。改为真实安装后，与 HEAD 的 diff
+收敛到 33 行（1 行指纹 + 实际代码改动）。
+
+判据（提交前自查，两条都要过）：
+
+1. `git diff --stat` 的改动行数与实际源码改动相称；凭空多出几千行就是路径污染。
+2. `grep -c "Users/" packages/cli/dist/zhshield.js` 为 0，且 `grep -c "/tmp/wt-"` 为 0。
+   （产物里本就有 `"/private/tmp/"` 这个源码常量，属正常，别误判。）
 
 ## ⚠️ Monorepo 依赖陷阱：pnpm 注入副本不同步（已踩三次，必读）
 

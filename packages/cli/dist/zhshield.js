@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 98fa042e36827327
+// @zh-src-hash: a688bf44122a6f2b
 // @zh-src-files: 434
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -16828,7 +16828,7 @@ var init_capability_registry2 = __esm({
     "use strict";
     init_ownership_registry();
     SCAN_DOMAIN_BUDGETS = {
-      inspect: 15e4,
+      inspect: 24e4,
       guard: 1e4,
       security: 3e5,
       deps: 9e4,
@@ -500836,7 +500836,7 @@ var init_semgrep_adapter = __esm({
         try {
           return await this.executeScan(options2, rulesDir, start);
         } catch (error) {
-          return this.buildErrorResult(start, error);
+          return this.buildErrorResult(start, error, options2.projectPath);
         }
       }
       async executeScan(options2, rulesDir, start) {
@@ -500845,7 +500845,7 @@ var init_semgrep_adapter = __esm({
         }
         const args = this.buildScanArgs(rulesDir, options2);
         const output = await this.runSemgrep(args, options2);
-        const issues = this.mapOutput(output);
+        const issues = this.mapOutput(output, options2.projectPath);
         return this.buildAvailableResult(start, output, issues);
       }
       async rulesDirAccessible(rulesDir) {
@@ -500908,19 +500908,19 @@ var init_semgrep_adapter = __esm({
         });
         return JSON.parse(stdout);
       }
-      buildErrorResult(start, err) {
+      buildErrorResult(start, err, projectRoot) {
         return buildStandardErrorResult("semgrep", start, err, {
           unavailableHint: "Semgrep \u672A\u5B89\u88C5\uFF08\u9879\u76EE\u672C\u5730 node_modules/.bin\u3001~/.zhshield/bin\u3001PATH \u5747\u672A\u627E\u5230\uFF09",
           failureMessage: "Semgrep \u6267\u884C\u5931\u8D25",
-          parsePartial: (stdout) => this.parsePartialOutput(stdout)
+          parsePartial: (stdout) => this.parsePartialOutput(stdout, projectRoot)
         });
       }
-      parsePartialOutput(stdout) {
+      parsePartialOutput(stdout, projectRoot) {
         if (!stdout) return null;
         try {
           const output = JSON.parse(stdout);
           if (Array.isArray(output?.results)) {
-            return this.mapOutput(output);
+            return this.mapOutput(output, projectRoot);
           }
         } catch {
         }
@@ -500951,12 +500951,30 @@ var init_semgrep_adapter = __esm({
         }
         return null;
       }
-      mapOutput(output) {
+      /** 污点链位置同口径相对化：链里的 file 也是绝对路径，落盘后同样会拼出双拼 URI */
+      normalizeCodeFlows(codeFlows, projectRoot) {
+        if (!codeFlows) return void 0;
+        return codeFlows.map((flow) => ({
+          ...flow,
+          threadFlows: flow.threadFlows.map((threadFlow) => ({
+            ...threadFlow,
+            locations: threadFlow.locations.map((loc) => ({
+              ...loc,
+              location: { ...loc.location, file: toRelativePath(projectRoot, loc.location.file) }
+            }))
+          }))
+        }));
+      }
+      mapOutput(output, projectRoot) {
         const results = output.results ?? [];
         return semgrepMapper(output).map((issue, idx) => {
           const result = results[idx];
           const codeFlows = result === void 0 ? void 0 : this.mapDataflowTrace(result);
-          return { ...issue, codeFlows };
+          return {
+            ...issue,
+            file: projectRoot ? toRelativePath(projectRoot, issue.file) : issue.file,
+            codeFlows: projectRoot ? this.normalizeCodeFlows(codeFlows, projectRoot) : codeFlows
+          };
         });
       }
       /** dataflow_trace → SARIF 兼容 codeFlows（source→sink 污点链；缺 location 子对象的条目跳过）。顶层与 extra 嵌套两种落点都接受 */
@@ -511099,6 +511117,15 @@ function extractSkipReason(message, toolName) {
   return msg.startsWith(prefix) && msg.endsWith("\uFF09") ? msg.slice(prefix.length, -1) : msg;
 }
 async function scanWithOneScanner(host, rule, toolName, context) {
+  if (isGuardConclusionMode(rule, context)) {
+    const one2 = await evalToolDispatch(
+      host,
+      rule,
+      { type: "tool-dispatch", tool: toolName, toolConfig: {}, conditions: {}, judgment: {}, fix: {} },
+      context
+    );
+    return scannerOutcomeOf(toolName, one2);
+  }
   if (!host.toolAdapters.has(toolName)) {
     return { ran: false, violations: [], reason: `${toolName}(\u672A\u6CE8\u518C\u5DE5\u5177\u9002\u914D\u5668: ${toolName})` };
   }
@@ -511115,6 +511142,9 @@ async function scanWithOneScanner(host, rule, toolName, context) {
     },
     context
   );
+  return scannerOutcomeOf(toolName, one);
+}
+function scannerOutcomeOf(toolName, one) {
   const violations = one.violations ?? [];
   if (one.status === "error" && violations.length === 0) {
     return {
@@ -518018,16 +518048,17 @@ var SemgrepScanArgsBuilder = class {
 
 // ../inspect/src/adapters/semgrep-result-mapper.ts
 var import_node_crypto14 = require("node:crypto");
+init_src2();
 var SemgrepResultMapper = class {
-  mapOutput(output, category = "security") {
+  mapOutput(output, category = "security", projectRoot) {
     const results = output?.results;
     if (!Array.isArray(results)) return [];
-    return results.map((r) => this.mapResult(r, category));
+    return results.map((r) => this.mapResult(r, category, projectRoot));
   }
-  mapResult(r, category) {
+  mapResult(r, category, projectRoot) {
     const ruleId = this.resolveRuleId(r);
     const fix = this.resolveFix(r);
-    const loc = this.resolveLocation(r);
+    const loc = this.resolveLocation(r, projectRoot);
     return {
       id: (0, import_node_crypto14.randomUUID)(),
       ruleId,
@@ -518040,8 +518071,14 @@ var SemgrepResultMapper = class {
       suggestion: fix,
       autoFixable: !!fix,
       source: "inspect",
-      fingerprint: this.resolveFingerprint(ruleId, loc),
-      codeFlows: this.resolveCodeFlows(r),
+      // ⚠️ fingerprint 是**身份键**（白名单 / 豁免 / 冲突归一都按它匹配），必须保持
+      // 相对化之前的口径：用 semgrep 原样的 r.path。跟着 `file` 一起相对化会让
+      // 用户已有豁免条目静默失效，而且 security 侧仍用原口径，两侧键空间会分叉。
+      fingerprint: this.resolveFingerprint(ruleId, {
+        file: r.path || "",
+        line: loc.line
+      }),
+      codeFlows: this.resolveCodeFlows(r, projectRoot),
       taxonomies: this.resolveTaxonomies(r)
     };
   }
@@ -518049,11 +518086,15 @@ var SemgrepResultMapper = class {
    * 将 dataflow_trace 映射为 SARIF-compatible codeFlows：
    * taint_source → intermediate_vars → taint_sink 的 locations 链
    */
-  resolveCodeFlows(r) {
+  resolveCodeFlows(r, projectRoot) {
     const trace = r.dataflow_trace ?? r.extra?.dataflow_trace;
     if (!trace) return void 0;
-    const locations = this.collectTraceLocations(trace);
-    if (locations.length === 0) return void 0;
+    const collected = this.collectTraceLocations(trace);
+    if (collected.length === 0) return void 0;
+    const locations = projectRoot ? collected.map((loc) => ({
+      ...loc,
+      location: { ...loc.location, file: this.normalizePath(loc.location.file, projectRoot) }
+    })) : collected;
     return [{ threadFlows: [{ locations }] }];
   }
   /** 收集 taint_source → intermediate_vars → taint_sink 的 locations 链 */
@@ -518123,12 +518164,17 @@ var SemgrepResultMapper = class {
   resolveMessage(r, ruleId) {
     return r.extra?.message || r.message || `Semgrep: ${ruleId}`;
   }
-  resolveLocation(r) {
+  resolveLocation(r, projectRoot) {
     return {
-      file: r.path || "",
+      file: this.normalizePath(r.path, projectRoot),
       line: r.start?.line || 0,
       column: r.start?.col || r.start?.column || 0
     };
+  }
+  /** 绝对路径 → 相对仓库根（无 projectRoot 时原样返回，兼容只读调用方） */
+  normalizePath(file, projectRoot) {
+    if (!file) return "";
+    return projectRoot ? toRelativePath(projectRoot, file) : file;
   }
   resolveFingerprint(ruleId, loc) {
     return `semgrep:${ruleId}:${loc.file}:${loc.line}`;
@@ -518168,9 +518214,13 @@ var SemgrepScanRunner = class {
         timeout: options2.timeout || 12e4
       });
       const output = JSON.parse(stdout);
-      return this.buildAvailable(output, this.mapper.mapOutput(output, category), start);
+      return this.buildAvailable(
+        output,
+        this.mapper.mapOutput(output, category, options2.projectPath),
+        start
+      );
     } catch (error) {
-      return this.handleError(error, start, category);
+      return this.handleError(error, start, category, options2.projectPath);
     }
   }
   /**
@@ -518194,7 +518244,7 @@ var SemgrepScanRunner = class {
       });
       output = JSON.parse(stdout);
     } catch (error) {
-      const failure = this.handleError(error, start, category);
+      const failure = this.handleError(error, start, category, options2.projectPath);
       for (const key of keys) out.set(key, failure);
       return out;
     }
@@ -518224,12 +518274,19 @@ var SemgrepScanRunner = class {
     }
     for (const key of keys) {
       const subset = { results: groups.get(key) ?? [], errors: [] };
-      out.set(key, this.buildAvailable(subset, this.mapper.mapOutput(subset, category), start));
+      out.set(
+        key,
+        this.buildAvailable(
+          subset,
+          this.mapper.mapOutput(subset, category, options2.projectPath),
+          start
+        )
+      );
     }
     return out;
   }
   /** 处理 semgrep 执行错误：未安装 / 超时 / 输出错误 */
-  handleError(error, start, category) {
+  handleError(error, start, category, projectRoot) {
     const err = asToolExecError(error);
     if (err.code === "ENOENT") {
       return this.buildUnavailable(start, "Semgrep \u672A\u5B89\u88C5\u6216\u672A\u5728 PATH \u4E2D\u627E\u5230");
@@ -518237,15 +518294,15 @@ var SemgrepScanRunner = class {
     if (err.code === "ETIMEDOUT") {
       return this.buildError(start, "Semgrep \u626B\u63CF\u8D85\u65F6");
     }
-    return this.handleOutputError(err, start, category);
+    return this.handleOutputError(err, start, category, projectRoot);
   }
   /** 从 semgrep 输出中提取真实错误或部分结果 */
-  handleOutputError(err, start, category) {
+  handleOutputError(err, start, category, projectRoot) {
     const jsonError = this.extractJsonError(err.stdout);
     if (jsonError) {
       return this.buildError(start, jsonError);
     }
-    const partial = this.parsePartialOutput(err.stdout ?? "", category, err.stderr);
+    const partial = this.parsePartialOutput(err.stdout ?? "", category, err.stderr, projectRoot);
     if (partial) {
       return this.buildAvailable(partial.output, partial.issues, start);
     }
@@ -518286,11 +518343,11 @@ var SemgrepScanRunner = class {
       return null;
     }
   }
-  parsePartialOutput(stdout, category, stderr) {
+  parsePartialOutput(stdout, category, stderr, projectRoot) {
     if (!stdout) return null;
     const output = this.parseStdoutJson(stdout);
     if (!output) return null;
-    const issues = this.mapper.mapOutput(output, category);
+    const issues = this.mapper.mapOutput(output, category, projectRoot);
     if (issues.length > 0 || !this.nonNoiseError(stderr)) {
       return { output, issues };
     }

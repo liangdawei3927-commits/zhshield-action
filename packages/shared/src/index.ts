@@ -262,6 +262,7 @@ export {
 } from './refactor-baseline-io';
 export type { RefactorBaselineCounts, RefactorBaselineRecord } from './refactor-baseline-io';
 export { safeReadDirEntries, expandHome } from './fs-safe';
+export { NOISE_DIRS } from './noise-dirs';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
 export {

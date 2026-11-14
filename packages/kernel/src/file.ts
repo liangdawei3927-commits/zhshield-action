@@ -1,18 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { safeJoin } from '@zh/shared';
+import { NOISE_DIRS, safeJoin } from '@zh/shared';
 import picomatch from 'picomatch';
-
-/** 噪声目录：递归 glob 时跳过，避免遍历依赖/构建产物（与 scan-utils 的 NOISE_DIRS 对齐） */
-const SKIP_DIRS = new Set([
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  'release',
-  '.turbo',
-  '.cache',
-]);
 
 /** 递归遍历深度上限：防止病态深层目录树导致栈溢出 */
 const MAX_GLOB_DEPTH = 64;
@@ -74,7 +63,7 @@ async function walkGlob(currentDir: string, options: WalkGlobOptions, depth = 0)
     const fullPath = safeJoin(currentDir, entry.name);
     if (entry.isDirectory()) {
       // 跳过噪声目录与点开头目录（含 .git），不深入遍历
-      if (entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) continue;
+      if (entry.name.startsWith('.') || NOISE_DIRS.has(entry.name)) continue;
       // perf rule false positive: arg depends on loop var via dataflow
       // eslint-disable-next-line perf/perf-no-serial-await
       await walkGlob(fullPath, options, depth + 1);

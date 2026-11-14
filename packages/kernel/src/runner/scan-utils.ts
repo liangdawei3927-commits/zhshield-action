@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-import { escapeRegExp } from '@zh/shared';
+import { NOISE_DIRS, escapeRegExp } from '@zh/shared';
 
 import type { SopRule } from '../sop/_meta/sop-types';
 import type { RuleContext } from '../sop/_meta/rule-context';
@@ -31,17 +31,6 @@ const SAFE_LAYER_NAME_RE = /^[a-zA-Z0-9._-]{1,64}$/;
 
 /** 候选源码根目录：按优先级依次探测，取第一个存在的目录 */
 const CANDIDATE_SOURCE_ROOTS = ['src', 'packages', 'app', 'lib', 'cmd', 'internal'];
-
-/** 噪声目录：扫描时跳过（含点开头目录），避免把依赖/构建产物当源码 */
-const NOISE_DIRS = new Set([
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  'release',
-  '.turbo',
-  '.cache',
-]);
 
 /** 根目录密度扫描阈值：repoRoot 下直接源码文件数 ≥ 该值才视为源码根 */
 const ROOT_DENSITY_THRESHOLD = 3;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// @zh-src-hash: a7726fe75d850ae6
-// @zh-src-files: 431
+// @zh-src-hash: 10d6230c991560d8
+// @zh-src-files: 432
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
 var __create = Object.create;
@@ -17188,6 +17188,23 @@ var init_fs_safe = __esm({
   }
 });
 
+// ../shared/src/noise-dirs.ts
+var NOISE_DIRS;
+var init_noise_dirs = __esm({
+  "../shared/src/noise-dirs.ts"() {
+    "use strict";
+    NOISE_DIRS = /* @__PURE__ */ new Set([
+      "node_modules",
+      "dist",
+      "build",
+      "coverage",
+      "release",
+      ".turbo",
+      ".cache"
+    ]);
+  }
+});
+
 // ../shared/src/text-utils.ts
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -17863,6 +17880,7 @@ __export(src_exports, {
   HEALTH_SCORE_DIMENSIONS: () => HEALTH_SCORE_DIMENSIONS,
   INSPECT_SCOPE_DOMAINS: () => INSPECT_SCOPE_DOMAINS,
   MAX_LOG_FIELD_LENGTH: () => MAX_LOG_FIELD_LENGTH,
+  NOISE_DIRS: () => NOISE_DIRS,
   NOOP_EMITTER: () => NOOP_EMITTER,
   OWNERSHIP_CLAIMS: () => OWNERSHIP_CLAIMS,
   PathTraversalError: () => PathTraversalError,
@@ -18012,6 +18030,7 @@ var init_src2 = __esm({
     init_baseline();
     init_refactor_baseline_io();
     init_fs_safe();
+    init_noise_dirs();
     init_text_utils();
     init_promise_timeout();
     init_tool_process_registry();
@@ -500122,11 +500141,11 @@ var init_vulnerability_scanner = __esm({
 });
 
 // ../security/src/scan-walk.ts
-var SKIP_DIRS3, MAX_SCAN_DEPTH2, PACKAGE_JSON_FILE;
+var SKIP_DIRS2, MAX_SCAN_DEPTH2, PACKAGE_JSON_FILE;
 var init_scan_walk = __esm({
   "../security/src/scan-walk.ts"() {
     "use strict";
-    SKIP_DIRS3 = /* @__PURE__ */ new Set([
+    SKIP_DIRS2 = /* @__PURE__ */ new Set([
       "node_modules",
       ".git",
       "dist",
@@ -500295,7 +500314,7 @@ var init_malware_scanner = __esm({
         for (const entry of safeReadDirEntries(dir2)) {
           const fullPath = safeJoin(dir2, entry.name);
           if (entry.isDirectory()) {
-            if (SKIP_DIRS3.has(entry.name)) continue;
+            if (SKIP_DIRS2.has(entry.name)) continue;
             this.walk(fullPath, depth + 1, projectPath, items);
             continue;
           }
@@ -501948,7 +501967,7 @@ var init_injection_guard = __esm({
         for (const entry of entries) {
           const fullPath = path60.join(dir2, entry.name);
           if (entry.isDirectory()) {
-            if (SKIP_DIRS3.has(entry.name)) continue;
+            if (SKIP_DIRS2.has(entry.name)) continue;
             this.walk(fullPath, depth + 1, projectPath, items);
             continue;
           }
@@ -503063,7 +503082,7 @@ function walkFiles(dir2, depth, out, exts) {
   }
   for (const entry of entries) {
     if (entry.isDirectory()) {
-      if (SKIP_DIRS3.has(entry.name)) continue;
+      if (SKIP_DIRS2.has(entry.name)) continue;
       walkFiles(path65.join(dir2, entry.name), depth + 1, out, exts);
       continue;
     }
@@ -507010,15 +507029,6 @@ var fs15 = __toESM(require("fs"));
 var path16 = __toESM(require("path"));
 init_src2();
 var import_picomatch = __toESM(require_picomatch4());
-var SKIP_DIRS = /* @__PURE__ */ new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "release",
-  ".turbo",
-  ".cache"
-]);
 var MAX_GLOB_DEPTH = 64;
 var FileHelper = class {
   static async readJSON(filePath) {
@@ -507063,7 +507073,7 @@ async function walkGlob(currentDir, options2, depth = 0) {
   for (const entry of dirEntries) {
     const fullPath = safeJoin(currentDir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name.startsWith(".") || SKIP_DIRS.has(entry.name)) continue;
+      if (entry.name.startsWith(".") || NOISE_DIRS.has(entry.name)) continue;
       await walkGlob(fullPath, options2, depth + 1);
       continue;
     }
@@ -507995,15 +508005,6 @@ var RE_DANGEROUS_GROUP = /\([^()]*[+*?{][^()]*\)[+*?{]/;
 var RE_GROUP_MODIFIER = /\(\?[=!:<>]/g;
 var SAFE_LAYER_NAME_RE = /^[a-zA-Z0-9._-]{1,64}$/;
 var CANDIDATE_SOURCE_ROOTS = ["src", "packages", "app", "lib", "cmd", "internal"];
-var NOISE_DIRS = /* @__PURE__ */ new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "release",
-  ".turbo",
-  ".cache"
-]);
 var ROOT_DENSITY_THRESHOLD = 3;
 var MAX_SCAN_DEPTH = 12;
 var MAX_SCAN_FILES = 2e3;
@@ -514234,6 +514235,7 @@ function sortFindings(findings) {
 // ../dependency/src/adapters/project-root.ts
 var fs25 = __toESM(require("fs"));
 var path27 = __toESM(require("path"));
+init_src2();
 var LOCKFILE_NAMES = [
   "pnpm-lock.yaml",
   "package-lock.json",
@@ -514242,15 +514244,6 @@ var LOCKFILE_NAMES = [
   "Pipfile.lock"
 ];
 var MAX_UPWARD_LEVELS = 10;
-var NESTED_PROBE_NOISE_DIRS = /* @__PURE__ */ new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "release",
-  ".turbo",
-  ".cache"
-]);
 var MANIFEST_NAMES = ["package.json", "pyproject.toml", "Pipfile", "requirements.txt"];
 function hasRecognizedLockfile(dir2) {
   return LOCKFILE_NAMES.some((name) => fs25.existsSync(path27.join(dir2, name)));
@@ -514283,7 +514276,7 @@ function findUniqueLockfileChild(dir2) {
   } catch {
     return null;
   }
-  const candidates = entries.filter((entry) => entry.isDirectory()).filter((entry) => !entry.name.startsWith(".") && !NESTED_PROBE_NOISE_DIRS.has(entry.name)).map((entry) => path27.join(dir2, entry.name)).filter((candidate) => hasRecognizedLockfile(candidate) && hasProjectManifest(candidate));
+  const candidates = entries.filter((entry) => entry.isDirectory()).filter((entry) => !entry.name.startsWith(".") && !NOISE_DIRS.has(entry.name)).map((entry) => path27.join(dir2, entry.name)).filter((candidate) => hasRecognizedLockfile(candidate) && hasProjectManifest(candidate));
   return candidates.length === 1 ? candidates[0] : null;
 }
 function resolveProjectRoot(projectPath) {
@@ -514413,7 +514406,7 @@ var DEFAULT_UPGRADE_CATALOG = {
   ]
 };
 var DEFAULT_SCAN_LIMIT = 50;
-var SKIP_DIRS2 = /* @__PURE__ */ new Set(["node_modules", "dist", ".git"]);
+var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", "dist", ".git"]);
 var SAFE_PACKAGE_NAME_RE = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
 var MAX_PACKAGE_NAME_LENGTH = 214;
 function isSafePackageName(name) {
@@ -514460,7 +514453,7 @@ function scanAffectedFiles(projectRoot, packageName, scanLimit) {
     }
     for (const entry of entries) {
       if (scanned >= scanLimit) return;
-      if (SKIP_DIRS2.has(entry.name)) continue;
+      if (SKIP_DIRS.has(entry.name)) continue;
       const full = safeJoin(dir2, entry.name);
       if (entry.isDirectory()) {
         walk2(full);
@@ -520136,15 +520129,6 @@ function readPackageJson3(pkgPath) {
     return {};
   }
 }
-var NESTED_PROBE_NOISE_DIRS2 = /* @__PURE__ */ new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "release",
-  ".turbo",
-  ".cache"
-]);
 function resolveEffectiveProjectRoot(projectPath) {
   const root = path67.resolve(projectPath);
   if (fs63.existsSync(path67.join(root, "package.json"))) return root;
@@ -520163,7 +520147,7 @@ function listNestedProjectRootCandidates(root) {
   const candidates = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith(".") || NESTED_PROBE_NOISE_DIRS2.has(entry.name)) continue;
+    if (entry.name.startsWith(".") || NOISE_DIRS.has(entry.name)) continue;
     const pkgPath = path67.join(root, entry.name, "package.json");
     try {
       JSON.parse(fs63.readFileSync(pkgPath, "utf-8"));

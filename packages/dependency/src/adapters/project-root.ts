@@ -12,6 +12,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { NOISE_DIRS } from '@zh/shared';
+
 /** 与 graph-builder / lockfile-verifier 探测一致的可识别锁文件名 */
 const LOCKFILE_NAMES = [
   'pnpm-lock.yaml',
@@ -23,20 +25,6 @@ const LOCKFILE_NAMES = [
 
 /** 向上查找的保守边界（层数）：workspace 嵌套通常 ≤ 3 层，10 层足够且避免误伤无关祖先 */
 const MAX_UPWARD_LEVELS = 10;
-
-/**
- * 向下探测时跳过的噪声目录（与 @zh/pipeline 的 resolveEffectiveProjectRoot 同口径）。
- * 容器目录里常混有构建产物与工具缓存，它们自身可能带锁文件，但不是用户项目。
- */
-const NESTED_PROBE_NOISE_DIRS = new Set([
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  'release',
-  '.turbo',
-  '.cache',
-]);
 
 /** 受支持的清单文件：无清单的目录不算项目（防止 AI 工具缓存目录被当成项目） */
 const MANIFEST_NAMES = ['package.json', 'pyproject.toml', 'Pipfile', 'requirements.txt'] as const;
@@ -89,7 +77,7 @@ function findUniqueLockfileChild(dir: string): string | null {
   }
   const candidates = entries
     .filter((entry) => entry.isDirectory())
-    .filter((entry) => !entry.name.startsWith('.') && !NESTED_PROBE_NOISE_DIRS.has(entry.name))
+    .filter((entry) => !entry.name.startsWith('.') && !NOISE_DIRS.has(entry.name))
     .map((entry) => path.join(dir, entry.name))
     .filter((candidate) => hasRecognizedLockfile(candidate) && hasProjectManifest(candidate));
   return candidates.length === 1 ? candidates[0] : null;

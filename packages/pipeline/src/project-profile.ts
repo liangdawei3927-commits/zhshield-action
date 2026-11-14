@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  NOISE_DIRS,
   normalizePackageName,
   extractPyprojectDeps,
   extractRequirementsNames,
@@ -159,17 +160,6 @@ function readPackageJson(pkgPath: string): Record<string, unknown> {
   }
 }
 
-/** 嵌套仓库下探时跳过的噪声目录（语义对齐 kernel scan-utils 的 NOISE_DIRS） */
-const NESTED_PROBE_NOISE_DIRS = new Set([
-  'node_modules',
-  'dist',
-  'build',
-  'coverage',
-  'release',
-  '.turbo',
-  '.cache',
-]);
-
 /**
  * 解析有效项目根（容器目录下探）。
  *
@@ -213,7 +203,7 @@ function listNestedProjectRootCandidates(root: string): string[] {
   const candidates: string[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith('.') || NESTED_PROBE_NOISE_DIRS.has(entry.name)) continue;
+    if (entry.name.startsWith('.') || NOISE_DIRS.has(entry.name)) continue;
     const pkgPath = path.join(root, entry.name, 'package.json');
     try {
       JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));

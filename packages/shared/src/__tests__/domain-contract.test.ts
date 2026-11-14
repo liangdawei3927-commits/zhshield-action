@@ -142,8 +142,8 @@ describe('A11 能力注册表校验', () => {
   });
 
   it('Given 规范 §7.5 预算表，When 读取，Then 体检/安全/依赖预算有值且为整数秒级', () => {
-    // inspect 150s：85 条规则实测 92.89s，旧 90s 预算让它每次精确熔断（见预算表注释）
-    expect(SCAN_DOMAIN_BUDGETS.inspect).toBe(150_000);
+    // inspect 240s：85 条规则实测 146.86s，旧 150s 预算让它贴线踩超（连带破坏 A12 去重，见预算表注释）
+    expect(SCAN_DOMAIN_BUDGETS.inspect).toBe(240_000);
     // security 300s：云端规则集下实测 173s / 192s，旧 120s 让它每次精确熔断
     expect(SCAN_DOMAIN_BUDGETS.security).toBe(300_000);
     expect(SCAN_DOMAIN_BUDGETS.deps).toBe(90_000);

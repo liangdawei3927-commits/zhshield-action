@@ -52,6 +52,16 @@ export interface ToolCapability {
  * 被判"未检测"的健康域比多跑 60s 更伤用户信任（误报疲劳）。
  * 真实瓶颈（体检 + 安全两域就吃满 180s）仍要靠降低工具成本解决，调预算不解决 A14。
  *
+ * `inspect` 从 150s 调到 240s（2026-11-14）——仍然是「让测量有效」，这次多了一层后果：
+ * 体检域在全量扫描链下实测 146.86s，已经贴住 150s 预算，于是**时而踩线超预算**。
+ * 超预算不只是该域判 `unavailable`，还会连带破坏 A12：`runOne` 超时后会
+ * `killAll()` 强杀该域仍在跑的 semgrep 子进程，被强杀的调用结论「不明确」，
+ * `tool-run-scope` 按契约把它从重放表剔除（"结论不明确的失败不进重放表"），
+ * 随后 security 域的相同 argv 只能重新起一次进程 —— 实测全链
+ * `verify:tool-dedup` 报 `semgrep × 2` 同参 VIOLATION，而两域专跑（inspect 未超预算）
+ * 为 PASS。预算贴线会让一个健康域的抖动被记成去重机制失效，判据失去意义。
+ * 240s = 实测 146.86s + 约 60% 余量，与 security 300s 同一量级口径。
+ *
  * `security` 从 120s 调到 300s（2026-11-10）——同一个理由，且是同一个后果：
  * 云端规则集把安全域规则从 6 条扩到 26 条后，安全域在真实项目上实测 173s / 192s
  * （桌面端 300mm 级文档仓、85 条规则，`.zhshield` 与嵌套仓库已排除）。120s 预算下
@@ -60,7 +70,7 @@ export interface ToolCapability {
  * 300s 与 `pipeline-jobs` 里「5 分钟安全扫描」的原始预期一致。
  */
 export const SCAN_DOMAIN_BUDGETS = {
-  inspect: 150_000,
+  inspect: 240_000,
   guard: 10_000,
   security: 300_000,
   deps: 90_000,

@@ -1,17 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import type { ToolAdapter, ToolMeta, ToolResult, ToolScanOptions, Issue } from '@zh/shared';
-import { resolveToolCommandDetailed, runToolOnce } from '@zh/shared';
+import { resolveToolCommandDetailed, runToolOnce, trivyMapper } from '@zh/shared';
 import { isToolAvailable } from './adapter-helpers';
-import type {
-  ExecError,
-  TrivyOutput,
-  TrivyResult,
-  TrivyVulnerability,
-  TrivySecret,
-} from './tool-output-types';
+import type { ExecError, TrivyOutput } from './tool-output-types';
 
 /**
  * trivy 启动扫描时若本地无漏洞库（或版本过期），会尝试联网更新 DB；
@@ -250,61 +243,17 @@ export class TrivyAdapter implements ToolAdapter {
     return build ? build(projectPath, options) : null;
   }
 
+  /**
+   * 映射交给 `@zh/shared` 的 `trivyMapper`。
+   *
+   * 这段「trivy 输出 → Issue」的映射曾在本包与 `@zh/shared/output-mappers` 各写一份
+   * （2026-11-15 核实为逐字段等价：severity 三级折算、suggestion 仅在有 FixedVersion 时给、
+   * fingerprint 口径 `trivy:<id>:<target>:<pkg>` 全同）。两份同时存在时，改一处忘另一处
+   * **不会报错**——只会让同一份 trivy 扫描结果在 CLI/桌面两条链上产出不同的
+   * fingerprint，进而让豁免/白名单命中不一致。安全域的 semgrep 适配器已采用同一做法
+   * （复用 `semgrepMapper`），这里只是补齐。
+   */
   private mapOutput(output: TrivyOutput): Issue[] {
-    if (!output?.Results || !Array.isArray(output.Results)) return [];
-    const issues: Issue[] = [];
-
-    for (const result of output.Results) {
-      issues.push(...this.mapResultVulnerabilities(result));
-      issues.push(...this.mapResultSecrets(result));
-    }
-
-    return issues;
-  }
-
-  private mapResultVulnerabilities(result: TrivyResult): Issue[] {
-    if (!Array.isArray(result.Vulnerabilities)) return [];
-    return result.Vulnerabilities.map((vuln) => this.mapVulnerability(vuln, result.Target || ''));
-  }
-
-  private mapVulnerability(vuln: TrivyVulnerability, target: string): Issue {
-    const sev = (vuln.Severity || '').toUpperCase();
-    return {
-      id: randomUUID(),
-      ruleId: vuln.VulnerabilityID || 'trivy-unknown',
-      severity:
-        sev === 'CRITICAL' || sev === 'HIGH' ? 'error' : sev === 'MEDIUM' ? 'warning' : 'info',
-      category: 'security',
-      message: `${vuln.PkgName || '?'}@${vuln.InstalledVersion || '?'}: ${vuln.Title || vuln.VulnerabilityID || ''}`,
-      file: target,
-      line: 0,
-      column: 0,
-      suggestion: vuln.FixedVersion ? `升级到 ${vuln.FixedVersion}` : undefined,
-      autoFixable: !!vuln.FixedVersion,
-      source: 'security',
-      fingerprint: `trivy:${vuln.VulnerabilityID || ''}:${target}:${vuln.PkgName || ''}`,
-    };
-  }
-
-  private mapResultSecrets(result: TrivyResult): Issue[] {
-    if (!Array.isArray(result.Secrets)) return [];
-    return result.Secrets.map((secret) => this.mapSecret(secret, result.Target || ''));
-  }
-
-  private mapSecret(secret: TrivySecret, target: string): Issue {
-    return {
-      id: randomUUID(),
-      ruleId: `trivy-secret-${secret.RuleID || 'unknown'}`,
-      severity: 'error',
-      category: 'security',
-      message: secret.Title || `Secret detected: ${secret.RuleID}`,
-      file: secret.File || target,
-      line: secret.StartLine || 0,
-      column: 0,
-      suggestion: '移除硬编码的密钥，使用环境变量或密钥管理服务',
-      autoFixable: false,
-      source: 'security',
-      fingerprint: `trivy-secret:${secret.RuleID || ''}:${secret.File || ''}:${secret.StartLine || 0}`,
-    };
+    return trivyMapper(output);
   }
 }

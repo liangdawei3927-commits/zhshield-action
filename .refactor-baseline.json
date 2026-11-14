@@ -2,9 +2,6 @@
   "version": 2,
   "generatedAt": "2026-11-13T15:34:07.262Z",
   "entries": {
-    "packages/cli/src/sop-banner.ts": {
-      "long-parameter-list": 1
-    },
     "packages/dependency/src/adapters/lockfile-verifier.ts": {
       "duplicated-code": 1
     },
@@ -175,9 +172,6 @@
     },
     "packages/inspect/src/adapters/ts-prune-adapter-core.ts": {
       "duplicated-code": 1
-    },
-    "packages/inspect/src/adapters/typescript-adapter.ts": {
-      "long-parameter-list": 1
     },
     "packages/inspect/src/scan-report-builder.ts": {
       "duplicated-code": 1

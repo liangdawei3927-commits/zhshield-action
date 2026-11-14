@@ -1,4 +1,4 @@
-import { semgrepMapper } from '@zh/shared';
+import { semgrepMapper, toRelativePath } from '@zh/shared';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -47,7 +47,7 @@ export class SemgrepAdapter implements ToolAdapter {
     try {
       return await this.executeScan(options, rulesDir, start);
     } catch (error) {
-      return this.buildErrorResult(start, error as ExecError);
+      return this.buildErrorResult(start, error as ExecError, options.projectPath);
     }
   }
 
@@ -61,7 +61,7 @@ export class SemgrepAdapter implements ToolAdapter {
     }
     const args = this.buildScanArgs(rulesDir, options);
     const output = await this.runSemgrep(args, options);
-    const issues = this.mapOutput(output);
+    const issues = this.mapOutput(output, options.projectPath);
     return this.buildAvailableResult(start, output, issues);
   }
 
@@ -147,21 +147,21 @@ export class SemgrepAdapter implements ToolAdapter {
     return JSON.parse(stdout);
   }
 
-  private buildErrorResult(start: number, err: ExecError): ToolResult {
+  private buildErrorResult(start: number, err: ExecError, projectRoot?: string): ToolResult {
     return buildStandardErrorResult('semgrep', start, err, {
       unavailableHint:
         'Semgrep 未安装（项目本地 node_modules/.bin、~/.zhshield/bin、PATH 均未找到）',
       failureMessage: 'Semgrep 执行失败',
-      parsePartial: (stdout) => this.parsePartialOutput(stdout),
+      parsePartial: (stdout) => this.parsePartialOutput(stdout, projectRoot),
     });
   }
 
-  private parsePartialOutput(stdout: string | undefined): Issue[] | null {
+  private parsePartialOutput(stdout: string | undefined, projectRoot?: string): Issue[] | null {
     if (!stdout) return null;
     try {
       const output = JSON.parse(stdout);
       if (Array.isArray(output?.results)) {
-        return this.mapOutput(output);
+        return this.mapOutput(output, projectRoot);
       }
     } catch {
       // 部分输出可能不是合法 JSON
@@ -199,7 +199,22 @@ export class SemgrepAdapter implements ToolAdapter {
     return null;
   }
 
-  private mapOutput(output: SemgrepOutput): Issue[] {
+  /** 污点链位置同口径相对化：链里的 file 也是绝对路径，落盘后同样会拼出双拼 URI */
+  private normalizeCodeFlows(codeFlows: CodeFlow[] | undefined, projectRoot: string): CodeFlow[] | undefined {
+    if (!codeFlows) return undefined;
+    return codeFlows.map((flow) => ({
+      ...flow,
+      threadFlows: flow.threadFlows.map((threadFlow) => ({
+        ...threadFlow,
+        locations: threadFlow.locations.map((loc) => ({
+          ...loc,
+          location: { ...loc.location, file: toRelativePath(projectRoot, loc.location.file) },
+        })),
+      })),
+    }));
+  }
+
+  private mapOutput(output: SemgrepOutput, projectRoot?: string): Issue[] {
     // 公共字段由 @zh/shared 的 semgrepMapper 产出：它与 data.results 一一对应，
     // 故按下标把本适配器独有的污点链（codeFlows）回填到对应 Issue 上。
     const results = output.results ?? [];
@@ -208,7 +223,13 @@ export class SemgrepAdapter implements ToolAdapter {
       // 但编译器无法证明）—— 越界时该 Issue 没有污点链，而不是崩掉整个扫描。
       const result = results[idx];
       const codeFlows = result === undefined ? undefined : this.mapDataflowTrace(result);
-      return { ...issue, codeFlows };
+      // 落盘口径：semgrep 的 r.path 是绝对路径（以 --target 为基准），这里统一相对化。
+      // 绝对路径会让前端拼出 file:///tmp/p/tmp/p/src/a.ts 双拼 URI、跳转全部 404。
+      return {
+        ...issue,
+        file: projectRoot ? toRelativePath(projectRoot, issue.file) : issue.file,
+        codeFlows: projectRoot ? this.normalizeCodeFlows(codeFlows, projectRoot) : codeFlows,
+      };
     });
   }
 

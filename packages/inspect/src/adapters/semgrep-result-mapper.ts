@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { toRelativePath } from '@zh/shared';
 import type { Issue, IssueCategory, CodeFlow, CodeFlowLocation } from '@zh/shared';
 
 /** Semgrep 输出中的位置（dataflow_trace 内部复用） */
@@ -61,19 +62,28 @@ export interface SemgrepOutput {
 
 /**
  * SemgrepResultMapper — 将 Semgrep JSON 输出映射为统一的 Issue 结构
+ *
+ * `projectRoot` 用于把 semgrep 输出的绝对路径归一成相对仓库根的路径。
+ * 落盘/存储一律相对（见 `@zh/shared` 的 `domain-contract/path.ts`）：绝对路径会让
+ * 前端拼出 `file:///tmp/p/tmp/p/src/a.ts` 这种双拼 URI，跳转全部 404（已实测）。
+ * 不传时保持原样返回，向后兼容只读调用方.
  */
 export class SemgrepResultMapper {
-  mapOutput(output: SemgrepOutput, category: IssueCategory = 'security'): Issue[] {
+  mapOutput(
+    output: SemgrepOutput,
+    category: IssueCategory = 'security',
+    projectRoot?: string,
+  ): Issue[] {
     const results = output?.results;
     if (!Array.isArray(results)) return [];
 
-    return results.map((r) => this.mapResult(r, category));
+    return results.map((r) => this.mapResult(r, category, projectRoot));
   }
 
-  private mapResult(r: SemgrepResult, category: IssueCategory): Issue {
+  private mapResult(r: SemgrepResult, category: IssueCategory, projectRoot?: string): Issue {
     const ruleId = this.resolveRuleId(r);
     const fix = this.resolveFix(r);
-    const loc = this.resolveLocation(r);
+    const loc = this.resolveLocation(r, projectRoot);
 
     return {
       id: randomUUID(),
@@ -87,8 +97,14 @@ export class SemgrepResultMapper {
       suggestion: fix,
       autoFixable: !!fix,
       source: 'inspect',
-      fingerprint: this.resolveFingerprint(ruleId, loc),
-      codeFlows: this.resolveCodeFlows(r),
+      // ⚠️ fingerprint 是**身份键**（白名单 / 豁免 / 冲突归一都按它匹配），必须保持
+      // 相对化之前的口径：用 semgrep 原样的 r.path。跟着 `file` 一起相对化会让
+      // 用户已有豁免条目静默失效，而且 security 侧仍用原口径，两侧键空间会分叉。
+      fingerprint: this.resolveFingerprint(ruleId, {
+        file: r.path || '',
+        line: loc.line,
+      }),
+      codeFlows: this.resolveCodeFlows(r, projectRoot),
       taxonomies: this.resolveTaxonomies(r),
     };
   }
@@ -97,12 +113,19 @@ export class SemgrepResultMapper {
    * 将 dataflow_trace 映射为 SARIF-compatible codeFlows：
    * taint_source → intermediate_vars → taint_sink 的 locations 链
    */
-  private resolveCodeFlows(r: SemgrepResult): CodeFlow[] | undefined {
+  private resolveCodeFlows(r: SemgrepResult, projectRoot?: string): CodeFlow[] | undefined {
     const trace = r.dataflow_trace ?? r.extra?.dataflow_trace;
     if (!trace) return undefined;
 
-    const locations = this.collectTraceLocations(trace);
-    if (locations.length === 0) return undefined;
+    const collected = this.collectTraceLocations(trace);
+    if (collected.length === 0) return undefined;
+    // 污点链里的位置与主定位同口径：一律相对仓库根，否则跳转会拼出双拼 URI
+    const locations = projectRoot
+      ? collected.map((loc) => ({
+          ...loc,
+          location: { ...loc.location, file: this.normalizePath(loc.location.file, projectRoot) },
+        }))
+      : collected;
     return [{ threadFlows: [{ locations }] }];
   }
 
@@ -193,12 +216,21 @@ export class SemgrepResultMapper {
     return r.extra?.message || r.message || `Semgrep: ${ruleId}`;
   }
 
-  private resolveLocation(r: SemgrepResult): { file: string; line: number; column: number } {
+  private resolveLocation(
+    r: SemgrepResult,
+    projectRoot?: string,
+  ): { file: string; line: number; column: number } {
     return {
-      file: r.path || '',
+      file: this.normalizePath(r.path, projectRoot),
       line: r.start?.line || 0,
       column: r.start?.col || r.start?.column || 0,
     };
+  }
+
+  /** 绝对路径 → 相对仓库根（无 projectRoot 时原样返回，兼容只读调用方） */
+  private normalizePath(file: string | undefined, projectRoot?: string): string {
+    if (!file) return '';
+    return projectRoot ? toRelativePath(projectRoot, file) : file;
   }
 
   private resolveFingerprint(ruleId: string, loc: { file: string; line: number }): string {

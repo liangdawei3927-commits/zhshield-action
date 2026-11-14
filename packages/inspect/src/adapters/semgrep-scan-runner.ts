@@ -60,9 +60,13 @@ export class SemgrepScanRunner {
       });
 
       const output = JSON.parse(stdout);
-      return this.buildAvailable(output, this.mapper.mapOutput(output, category), start);
+      return this.buildAvailable(
+        output,
+        this.mapper.mapOutput(output, category, options.projectPath),
+        start,
+      );
     } catch (error: unknown) {
-      return this.handleError(error, start, category);
+      return this.handleError(error, start, category, options.projectPath);
     }
   }
 
@@ -92,7 +96,7 @@ export class SemgrepScanRunner {
       });
       output = JSON.parse(stdout) as SemgrepOutput;
     } catch (error: unknown) {
-      const failure = this.handleError(error, start, category);
+      const failure = this.handleError(error, start, category, options.projectPath);
       for (const key of keys) out.set(key, failure);
       return out;
     }
@@ -126,13 +130,25 @@ export class SemgrepScanRunner {
     }
     for (const key of keys) {
       const subset: SemgrepOutput = { results: groups.get(key) ?? [], errors: [] };
-      out.set(key, this.buildAvailable(subset, this.mapper.mapOutput(subset, category), start));
+      out.set(
+        key,
+        this.buildAvailable(
+          subset,
+          this.mapper.mapOutput(subset, category, options.projectPath),
+          start,
+        ),
+      );
     }
     return out;
   }
 
   /** 处理 semgrep 执行错误：未安装 / 超时 / 输出错误 */
-  private handleError(error: unknown, start: number, category: IssueCategory): ToolResult {
+  private handleError(
+    error: unknown,
+    start: number,
+    category: IssueCategory,
+    projectRoot?: string,
+  ): ToolResult {
     const err = asToolExecError(error);
     if (err.code === 'ENOENT') {
       return this.buildUnavailable(start, 'Semgrep 未安装或未在 PATH 中找到');
@@ -140,7 +156,7 @@ export class SemgrepScanRunner {
     if (err.code === 'ETIMEDOUT') {
       return this.buildError(start, 'Semgrep 扫描超时');
     }
-    return this.handleOutputError(err, start, category);
+    return this.handleOutputError(err, start, category, projectRoot);
   }
 
   /** 从 semgrep 输出中提取真实错误或部分结果 */
@@ -148,6 +164,7 @@ export class SemgrepScanRunner {
     err: ReturnType<typeof asToolExecError>,
     start: number,
     category: IssueCategory,
+    projectRoot?: string,
   ): ToolResult {
     // 优先报告 JSON errors 中的真实错误，而非 OCaml 运行时噪音
     const jsonError = this.extractJsonError(err.stdout);
@@ -156,7 +173,7 @@ export class SemgrepScanRunner {
     }
 
     // semgrep 存在 findings 时退出码为 1；stdout 仍为有效 JSON
-    const partial = this.parsePartialOutput(err.stdout ?? '', category, err.stderr);
+    const partial = this.parsePartialOutput(err.stdout ?? '', category, err.stderr, projectRoot);
     if (partial) {
       return this.buildAvailable(partial.output, partial.issues, start);
     }
@@ -213,11 +230,12 @@ export class SemgrepScanRunner {
     stdout: string,
     category: IssueCategory,
     stderr?: string,
+    projectRoot?: string,
   ): { output: SemgrepOutput; issues: Issue[] } | null {
     if (!stdout) return null;
     const output = this.parseStdoutJson(stdout);
     if (!output) return null;
-    const issues = this.mapper.mapOutput(output, category);
+    const issues = this.mapper.mapOutput(output, category, projectRoot);
     if (issues.length > 0 || !this.nonNoiseError(stderr)) {
       return { output, issues };
     }

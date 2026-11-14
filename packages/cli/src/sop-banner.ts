@@ -202,19 +202,32 @@ function reportNoGateRules(
   return {};
 }
 
+/** `finalizeScan` 的执行参数（单对象参数，避免形参超过 long-parameter-list 阈值） */
+export interface FinalizeScanParams {
+  /** 流水线运行器；`opts.sop` 为真时用于求值后置门禁 */
+  runner: PipelineRunner;
+  opts: { readonly sop: boolean };
+  /** 违规是否已判定为阻断 */
+  blocked: boolean;
+  /** 进程退出函数；缺省 `process.exit`（单测注入哨兵以观察退出码而不真的退出） */
+  exit?: (code?: number | string) => never;
+  /** 日志出口；缺省 stderr（门禁话术与诊断信息都经它输出） */
+  log?: (line: string) => void;
+}
+
 /**
  * 扫描类命令的统一出口：**先判门禁，再退出**。
  *
  * 退出码优先级：违规阻断（1）> 既有 exitCode（降级护栏 2）> 门禁结论。
  * 降级护栏的 2 不能被子门禁的 1 覆盖 —— 环境不完整比单条阈值更严重。
  */
-export function finalizeScan(
-  runner: PipelineRunner,
-  opts: { readonly sop: boolean },
-  blocked: boolean,
-  exit: (code?: number | string) => never = (code) => process.exit(code),
-  log: (line: string) => void = (line) => console.error(line),
-): never {
+export function finalizeScan({
+  runner,
+  opts,
+  blocked,
+  exit = (code) => process.exit(code),
+  log = (line) => console.error(line),
+}: FinalizeScanParams): never {
   const gate: GateReportOutcome = opts.sop ? reportPostScanGates(runner, log) : {};
   if (blocked) return exit(1);
   if (process.exitCode) return exit(process.exitCode);

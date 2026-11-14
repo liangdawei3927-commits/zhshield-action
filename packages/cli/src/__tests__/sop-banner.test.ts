@@ -245,7 +245,13 @@ describe('finalizeScan — 退出码优先级', () => {
 
   const run = (report: PostScanGateReport, blocked: boolean, sop = true): void => {
     try {
-      finalizeScan(fakeRunner(report), { sop }, blocked, exit, (line) => lines.push(line));
+      finalizeScan({
+        runner: fakeRunner(report),
+        opts: { sop },
+        blocked,
+        exit,
+        log: (line) => lines.push(line),
+      });
     } catch {
       // exit 的哨兵异常，正常路径
     }

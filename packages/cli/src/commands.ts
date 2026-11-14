@@ -89,7 +89,7 @@ export async function runGuardCommand(
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
     writeReportFile(opts, report, findings, { projectDir, command: 'guard-sop' });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   } else {
     const report = await runner.runGuard({ dryRun: opts.dryRun });
     const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
@@ -104,7 +104,7 @@ export async function runGuardCommand(
     console.log(formatted.text);
     writeReportFile(opts, report, findings, { projectDir, command: 'guard' });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   }
 }
 
@@ -133,7 +133,7 @@ export async function runInspectCommand(
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
     writeReportFile(opts, report, findings, { projectDir, command: 'inspect-sop' });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   } else {
     const report = await runner.runInspect();
     const { findings, blocked } = shouldBlock(report, opts.failOn, false, projectDir);
@@ -148,7 +148,7 @@ export async function runInspectCommand(
     console.log(formatted.text);
     writeReportFile(opts, report, findings, { projectDir, command: 'inspect' });
     applyDegradedGuard(report);
-    finalizeScan(runner, opts, blocked);
+    finalizeScan({ runner, opts, blocked });
   }
 }
 
@@ -173,7 +173,7 @@ export async function runRefactorCommand(
   });
   console.log(formatted.text);
   writeReportFile(opts, report, findings, { projectDir, command: 'refactor' });
-  finalizeScan(runner, opts, blocked);
+  finalizeScan({ runner, opts, blocked });
 }
 
 /** baseline capture：直扫 + SOP 双源合并、按匹配键去重后落基线 */
@@ -382,5 +382,5 @@ export async function runPipelineCommand(
   console.log(formatted.text);
   writeReportFile(opts, report, findings, { projectDir: ctx.projectDir, command: 'pipeline' });
   applyDegradedGuard(undefined, [report.guard, report.inspect]);
-  finalizeScan(runner, opts, blocked);
+  finalizeScan({ runner, opts, blocked });
 }

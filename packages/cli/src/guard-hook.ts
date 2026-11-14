@@ -46,14 +46,14 @@ export async function runGuardHookCommand({
       `[CLI] 门禁钩子（${hook}）无法判定：未发现供应商域快照（inspect/security/deps 均未落盘）。\n` +
         '[CLI] 这不是通过——请先运行对应域（桌面端一键体检或 `zhshield pipeline --full`）。',
     );
-    finalizeScan(runner, { sop: false }, false);
+    finalizeScan({ runner, opts: { sop: false }, blocked: false });
     return;
   }
 
   const report = await runner.runSopGuard({ dryRun: opts.dryRun, conclusions });
   if (report.total === 0) {
     finishUndeterminedHook('[CLI] 门禁钩子：SOP 规则为 0 条，本次未实际判定。');
-    finalizeScan(runner, { sop: false }, false);
+    finalizeScan({ runner, opts: { sop: false }, blocked: false });
     return;
   }
 
@@ -61,5 +61,5 @@ export async function runGuardHookCommand({
   const { findings, blocked } = shouldBlock(report, opts.failOn, opts.dryRun, projectDir);
   writeReportFile(opts, report, findings, { projectDir, command: 'guard-hook' });
   applyDegradedGuard(report);
-  finalizeScan(runner, { sop: false }, blocked);
+  finalizeScan({ runner, opts: { sop: false }, blocked });
 }

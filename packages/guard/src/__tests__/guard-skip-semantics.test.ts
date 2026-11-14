@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { promisify } from 'node:util';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -16,9 +17,33 @@ import type { CheckConfig } from '../types';
 
 let execFileMock: ReturnType<typeof vi.fn>;
 
-vi.mock('node:child_process', () => ({
-  execFile: (...args: unknown[]) => execFileMock(...args),
-}));
+/**
+ * 包装成与原生 `execFile` 等价的形态。
+ *
+ * 两个契约都必须复刻，缺一个用例就会假红（2026-11-14 实测）：
+ *   ① 回调是 `(error, stdout, stderr)` 三个位置参数，**stdout 是字符串**。
+ *      产品侧走 `promisify(execFile)`，按真实契约取第二参数；此前用例传
+ *      `cb(null, { stdout, stderr })`（把对象当 stdout），解析出 `"[object Object]"`，
+ *      `JSON.parse` 失败 → 判 error，用例红得像是产品缺陷。
+ *   ② 必须带 `util.promisify.custom`。丢掉它，promisify 会退回「回调单值」形态，
+ *      stdout 变 undefined —— `scripts/lib/tool-spy.cjs` 已把这个坑记录在案。
+ */
+vi.mock('node:child_process', () => {
+  const execFile = (...args: unknown[]) => execFileMock(...args);
+  Object.defineProperty(execFile, promisify.custom, {
+    value: (file: string, args: string[], options: unknown) =>
+      new Promise((resolve, reject) => {
+        execFileMock(file, args, options, (error: Error | null, stdout: string, stderr: string) => {
+          if (error) {
+            reject(Object.assign(error, { stdout, stderr }));
+            return;
+          }
+          resolve({ stdout, stderr });
+        });
+      }),
+  });
+  return { execFile };
+});
 
 function makeCheck(overrides: Partial<CheckConfig> = {}): CheckConfig {
   return {
@@ -63,8 +88,13 @@ function tempDirWith(files: Record<string, string>): string {
 
 beforeEach(() => {
   execFileMock = vi.fn(
-    (_cmd: string, _args: string[], _opts: unknown, cb: (e: Error | null, r?: unknown) => void) => {
-      cb(null, { stdout: '[]', stderr: '' });
+    (
+      _cmd: string,
+      _args: string[],
+      _opts: unknown,
+      cb: (e: Error | null, stdout: string, stderr: string) => void,
+    ) => {
+      cb(null, '[]', '');
     },
   );
 });
@@ -97,9 +127,15 @@ describe('GuardESLintCheckAdapter — 无 ESLint 配置时跳过而不是判失�
       'src/index.ts': 'export const a = 1;\n',
     });
     execFileMock = vi.fn(
-      (_c: string, _a: string[], _o: unknown, cb: (e: Error | null, r?: unknown) => void) =>
-        cb(null, {
-          stdout: JSON.stringify([
+      (
+        _c: string,
+        _a: string[],
+        _o: unknown,
+        cb: (e: Error | null, stdout: string, stderr: string) => void,
+      ) =>
+        cb(
+          null,
+          JSON.stringify([
             {
               filePath: path.join(dir, 'src/index.ts'),
               messages: [
@@ -107,8 +143,8 @@ describe('GuardESLintCheckAdapter — 无 ESLint 配置时跳过而不是判失�
               ],
             },
           ]),
-          stderr: '',
-        }),
+          '',
+        ),
     );
     const adapter = new GuardESLintCheckAdapter();
     const check = makeCheck();

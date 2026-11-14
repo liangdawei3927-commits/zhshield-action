@@ -1,15 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { detectMachineProfile } from '@zh/shared';
+import { resolveVitestMaxWorkers } from '@zh/shared';
 
-const clamp = (n: number, min: number, max: number): number => Math.min(Math.max(n, min), max);
-
-const envRaw = process.env.ZH_VITEST_MAX_WORKERS;
-const envMax = envRaw ? Number.parseInt(envRaw, 10) : Number.NaN;
-const maxWorkers = Number.isFinite(envMax)
-  ? clamp(envMax, 1, 4)
-  : detectMachineProfile().vitestMaxWorkers;
+const maxWorkers = resolveVitestMaxWorkers();
 
 /**
  * 与 `vite.config.ts` 保持同一注入口径：`__APP_VERSION__` 在测试里也要有值。

@@ -11,6 +11,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { constantTimeEqual } from '@zh/shared';
 
 export const PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(PUBLIC_KEY, true);
@@ -92,13 +93,5 @@ function isLocalIp(ip: string): boolean {
 }
 
 function verifyToken(token: string, expectedToken: string): boolean {
-  if (!token || !expectedToken) return false;
-
-  try {
-    const left = crypto.createHash('sha256').update(token).digest();
-    const right = crypto.createHash('sha256').update(expectedToken).digest();
-    return crypto.timingSafeEqual(left, right);
-  } catch {
-    return false;
-  }
+  return constantTimeEqual(token, expectedToken);
 }

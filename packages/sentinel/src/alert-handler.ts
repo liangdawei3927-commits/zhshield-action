@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import { constantTimeEqual } from '@zh/shared';
 import type { AlertPayload } from './types';
 import { EventCenter } from './event-center';
 
@@ -12,12 +12,7 @@ export class AlertHandler {
   }
 
   verifyToken(token: string): boolean {
-    if (!this.webhookToken || !token) return false;
-    return crypto.timingSafeEqual(this.hashToken(token), this.hashToken(this.webhookToken));
-  }
-
-  private hashToken(token: string): Buffer {
-    return crypto.createHash('sha256').update(token).digest();
+    return constantTimeEqual(token, this.webhookToken);
   }
 
   handleWebhook(

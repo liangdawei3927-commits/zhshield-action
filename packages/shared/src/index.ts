@@ -231,7 +231,11 @@ export type {
   DomainConclusionSet,
 } from './domain-contract';
 
-export { detectMachineProfile, type MachineProfile } from './machine-profile';
+export {
+  detectMachineProfile,
+  resolveVitestMaxWorkers,
+  type MachineProfile,
+} from './machine-profile';
 export {
   baselinePath,
   loadBaseline,
@@ -263,6 +267,7 @@ export {
 export type { RefactorBaselineCounts, RefactorBaselineRecord } from './refactor-baseline-io';
 export { safeReadDirEntries, expandHome } from './fs-safe';
 export { NOISE_DIRS } from './noise-dirs';
+export { constantTimeEqual } from './constant-time';
 export { escapeRegExp } from './text-utils';
 export { withHardTimeout } from './promise-timeout';
 export {

@@ -1,5 +1,5 @@
 import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
-import * as crypto from 'crypto';
+import { constantTimeEqual } from '@zh/shared';
 
 @Injectable()
 export class SentinelWebhookGuard implements CanActivate {
@@ -15,12 +15,6 @@ export class SentinelWebhookGuard implements CanActivate {
       return false;
     }
 
-    try {
-      const left = crypto.createHash('sha256').update(token).digest();
-      const right = crypto.createHash('sha256').update(expected).digest();
-      return crypto.timingSafeEqual(left, right);
-    } catch {
-      return false;
-    }
+    return constantTimeEqual(token, expected);
   }
 }

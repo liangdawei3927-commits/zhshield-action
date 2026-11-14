@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig, type ViteUserConfig } from 'vitest/config';
 import path from 'path';
-import { clamp, detectMachineProfile } from './machine-profile';
+import { resolveVitestMaxWorkers } from './machine-profile';
 
 /** Absolute path to the monorepo `packages/` directory. */
 export const packagesDir = path.resolve(__dirname, '..', '..');
@@ -21,18 +21,8 @@ export function packagesSrcAlias(...names: string[]): Record<string, string> {
   );
 }
 
-/**
- * vitest 最大 worker 数：优先读环境变量 ZH_VITEST_MAX_WORKERS（clamp 1..4），
- * 否则回退到机器画像（低配 2，否则 cores-1 封顶 4）。低配机避免同机并行打满内存（OOM/彩球）。
- */
-export function resolveVitestMaxWorkers(): number {
-  const envRaw = process.env.ZH_VITEST_MAX_WORKERS;
-  const envMax = envRaw ? Number.parseInt(envRaw, 10) : Number.NaN;
-  if (Number.isFinite(envMax)) {
-    return clamp(envMax, 1, 4);
-  }
-  return detectMachineProfile().vitestMaxWorkers;
-}
+/** vitest 最大 worker 数：实现已下沉到 machine-profile（不依赖 vitest），此处转出保持既有导入路径。 */
+export { resolveVitestMaxWorkers };
 
 /**
  * Shared vitest configuration base for all `@zh/*` packages.

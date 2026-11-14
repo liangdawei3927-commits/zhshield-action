@@ -1,13 +1,12 @@
-import * as crypto from 'node:crypto';
+import { constantTimeEqual } from '@zh/shared';
 
-/** 常量时间比较令牌（sha256 摘要 + timingSafeEqual，防时序侧信道） */
+/**
+ * 校验管理员令牌。
+ *
+ * 比较逻辑收敛到 `@zh/shared` 的 {@link constantTimeEqual}：此前 admin-token /
+ * local-only.guard / sentinel.guard / sentinel alert-handler 各写一份，
+ * 四处任一处被改写都不会有测试变红，只会让那个入口静默降级成普通比较。
+ */
 export function verifyAdminToken(token: string, expected: string): boolean {
-  if (!token || !expected) return false;
-  try {
-    const left = crypto.createHash('sha256').update(token).digest();
-    const right = crypto.createHash('sha256').update(expected).digest();
-    return crypto.timingSafeEqual(left, right);
-  } catch {
-    return false;
-  }
+  return constantTimeEqual(token, expected);
 }

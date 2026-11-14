@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// @zh-src-hash: 10d6230c991560d8
-// @zh-src-files: 432
+// @zh-src-hash: bbd86ea445aa36a5
+// @zh-src-files: 433
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
 var __create = Object.create;
@@ -16935,6 +16935,14 @@ var init_domain_contract = __esm({
 });
 
 // ../shared/src/machine-profile.ts
+function resolveVitestMaxWorkers() {
+  const envRaw = process.env.ZH_VITEST_MAX_WORKERS;
+  const envMax = envRaw ? Number.parseInt(envRaw, 10) : Number.NaN;
+  if (Number.isFinite(envMax)) {
+    return clamp(envMax, 1, 4);
+  }
+  return detectMachineProfile().vitestMaxWorkers;
+}
 function detectMachineProfile() {
   const cores = os5.cpus().length;
   const totalMemGb = os5.totalmem() / 1024 ** 3;
@@ -17202,6 +17210,25 @@ var init_noise_dirs = __esm({
       ".turbo",
       ".cache"
     ]);
+  }
+});
+
+// ../shared/src/constant-time.ts
+function constantTimeEqual(actual, expected) {
+  if (!actual || !expected) return false;
+  try {
+    const left = crypto2.createHash("sha256").update(actual).digest();
+    const right = crypto2.createHash("sha256").update(expected).digest();
+    return crypto2.timingSafeEqual(left, right);
+  } catch {
+    return false;
+  }
+}
+var crypto2;
+var init_constant_time = __esm({
+  "../shared/src/constant-time.ts"() {
+    "use strict";
+    crypto2 = __toESM(require("node:crypto"));
   }
 });
 
@@ -17909,6 +17936,7 @@ __export(src_exports, {
   clearBaseline: () => clearBaseline,
   clearRefactorBaseline: () => clearRefactorBaseline,
   computeOverallScore: () => computeOverallScore,
+  constantTimeEqual: () => constantTimeEqual,
   createBaselineIo: () => createBaselineIo,
   createDomainReport: () => createDomainReport,
   currentToolProcessScope: () => currentToolProcessScope,
@@ -17968,6 +17996,7 @@ __export(src_exports, {
   resolveSupplierDomain: () => resolveSupplierDomain,
   resolveToolCommand: () => resolveToolCommand,
   resolveToolCommandDetailed: () => resolveToolCommandDetailed,
+  resolveVitestMaxWorkers: () => resolveVitestMaxWorkers,
   runOncePerScope: () => runOncePerScope,
   runToolOnce: () => runToolOnce,
   safeJoin: () => safeJoin,
@@ -18031,6 +18060,7 @@ var init_src2 = __esm({
     init_refactor_baseline_io();
     init_fs_safe();
     init_noise_dirs();
+    init_constant_time();
     init_text_utils();
     init_promise_timeout();
     init_tool_process_registry();
@@ -440871,7 +440901,7 @@ var require_shared = __commonJS({
     exports2.getPathToSameFile = getPathToSameFile;
     exports2.getSourceFileFromProgram = getSourceFileFromProgram;
     exports2.getAstFromProgram = getAstFromProgram;
-    exports2.createHash = createHash3;
+    exports2.createHash = createHash4;
     var tsconfig_utils_1 = require_dist13();
     var node_path_1 = __importDefault(require("node:path"));
     var ts12 = __importStar(require_typescript());
@@ -440987,7 +441017,7 @@ var require_shared = __commonJS({
       }
       return ast && { ast, program: currentProgram };
     }
-    function createHash3(content) {
+    function createHash4(content) {
       if (ts12.sys?.createHash) {
         return ts12.sys.createHash(content);
       }
@@ -509089,7 +509119,7 @@ var SopLoader = class {
 };
 
 // ../kernel/src/sop/security/sop-signer.ts
-var crypto2 = __toESM(require("node:crypto"));
+var crypto3 = __toESM(require("node:crypto"));
 function canonicalTimestamp(timestamp) {
   return timestamp instanceof Date ? timestamp.toISOString() : timestamp;
 }
@@ -509101,7 +509131,7 @@ function signedPayload(hash, timestamp, keyId) {
   return keyId ? `${base}:${keyId}` : base;
 }
 function hmacSign(key, data) {
-  return crypto2.createHmac("sha256", key).update(data).digest("hex");
+  return crypto3.createHmac("sha256", key).update(data).digest("hex");
 }
 function verifyTimestamp(timestamp, windowMs) {
   const now = Date.now();
@@ -509117,11 +509147,11 @@ function verifyTimestamp(timestamp, windowMs) {
 function signEd25519(rules, privateKey, version, keyId) {
   const sorted = rules.toSorted((a, b) => a.id.localeCompare(b.id));
   const content = JSON.stringify(sorted);
-  const hash = crypto2.createHash("sha256").update(content).digest("hex");
+  const hash = crypto3.createHash("sha256").update(content).digest("hex");
   const timestamp = /* @__PURE__ */ new Date();
   const data = signedPayload(hash, timestamp, keyId);
-  const key = crypto2.createPrivateKey(privateKey);
-  const signature = crypto2.sign(null, Buffer.from(data, "utf-8"), key).toString("base64");
+  const key = crypto3.createPrivateKey(privateKey);
+  const signature = crypto3.sign(null, Buffer.from(data, "utf-8"), key).toString("base64");
   return {
     version: version ?? "0.0.0",
     rules: sorted,
@@ -509137,14 +509167,14 @@ function verifyEd25519(pkg, publicKey, windowMs) {
   if (!tsResult.valid) return tsResult;
   const sorted = pkg.rules.toSorted((a, b) => a.id.localeCompare(b.id));
   const content = JSON.stringify(sorted);
-  const expectedHash = crypto2.createHash("sha256").update(content).digest("hex");
+  const expectedHash = crypto3.createHash("sha256").update(content).digest("hex");
   if (pkg.hash !== expectedHash) {
     return { valid: false, reason: "hash_mismatch" };
   }
   const data = signedPayload(pkg.hash, pkg.timestamp, pkg.keyId);
   try {
-    const key = crypto2.createPublicKey(publicKey);
-    const valid = crypto2.verify(
+    const key = crypto3.createPublicKey(publicKey);
+    const valid = crypto3.verify(
       null,
       Buffer.from(data, "utf-8"),
       key,
@@ -509158,7 +509188,7 @@ function verifyEd25519(pkg, publicKey, windowMs) {
 function signHmac(rules, secretKey, version, keyId) {
   const sorted = rules.toSorted((a, b) => a.id.localeCompare(b.id));
   const content = JSON.stringify(sorted);
-  const hash = crypto2.createHash("sha256").update(content).digest("hex");
+  const hash = crypto3.createHash("sha256").update(content).digest("hex");
   const timestamp = /* @__PURE__ */ new Date();
   const signature = hmacSign(secretKey, signedPayload(hash, timestamp, keyId));
   return {
@@ -509176,7 +509206,7 @@ function verifyHmac(pkg, secretKey, windowMs) {
   if (!tsResult.valid) return tsResult;
   const sorted = pkg.rules.toSorted((a, b) => a.id.localeCompare(b.id));
   const content = JSON.stringify(sorted);
-  const expectedHash = crypto2.createHash("sha256").update(content).digest("hex");
+  const expectedHash = crypto3.createHash("sha256").update(content).digest("hex");
   if (pkg.hash !== expectedHash) {
     return { valid: false, reason: "hash_mismatch" };
   }
@@ -509303,7 +509333,7 @@ var SopSigner = class _SopSigner {
    * 生成 Nonce（唯一随机数）
    */
   static generateNonce() {
-    return crypto2.randomBytes(16).toString("hex");
+    return crypto3.randomBytes(16).toString("hex");
   }
   // ─── 本地存储加密（文档 11.4 节） ──────────────────────────
   /**
@@ -509312,8 +509342,8 @@ var SopSigner = class _SopSigner {
    */
   static encryptRules(rules, machineFingerprint, userId) {
     const key = _SopSigner.deriveKey(machineFingerprint, userId);
-    const iv = crypto2.randomBytes(16);
-    const cipher = crypto2.createCipheriv("aes-256-gcm", key, iv);
+    const iv = crypto3.randomBytes(16);
+    const cipher = crypto3.createCipheriv("aes-256-gcm", key, iv);
     const plaintext = JSON.stringify(rules);
     const encrypted = Buffer.concat([cipher.update(plaintext, "utf-8"), cipher.final()]);
     const authTag = cipher.getAuthTag();
@@ -509325,7 +509355,7 @@ var SopSigner = class _SopSigner {
     };
   }
   static deriveKey(machineFingerprint, userId) {
-    return crypto2.pbkdf2Sync(
+    return crypto3.pbkdf2Sync(
       `${machineFingerprint}:${userId}`,
       "zhshield-sop-cache",
       1e5,
@@ -509338,7 +509368,7 @@ var SopSigner = class _SopSigner {
    */
   static decryptRules(data, machineFingerprint, userId) {
     const key = _SopSigner.deriveKey(machineFingerprint, userId);
-    const decipher = crypto2.createDecipheriv("aes-256-gcm", key, Buffer.from(data.iv, "hex"), {
+    const decipher = crypto3.createDecipheriv("aes-256-gcm", key, Buffer.from(data.iv, "hex"), {
       authTagLength: 16
     });
     decipher.setAuthTag(Buffer.from(data.authTag, "hex"));
@@ -519929,6 +519959,9 @@ function subscribeScopeViolations(bus, center) {
     });
   });
 }
+
+// ../sentinel/src/alert-handler.ts
+init_src2();
 
 // ../sentinel/src/file-monitor.ts
 init_src2();

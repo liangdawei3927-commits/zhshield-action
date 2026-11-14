@@ -27,6 +27,23 @@ export const clamp = (n: number, min: number, max: number): number =>
   Math.min(Math.max(n, min), max);
 
 /**
+ * vitest 最大 worker 数：优先读环境变量 `ZH_VITEST_MAX_WORKERS`（clamp 1..4），
+ * 否则回退到机器画像（低配 2，否则 cores-1 封顶 4）。低配机避免同机并行打满内存。
+ *
+ * 放在 machine-profile（而非 vitest.config.base）是因为它**不依赖 vitest**：
+ * 根 `vitest.shared.ts` 与 `packages/desktop/vitest.config.ts` 此前各抄了一份
+ * 同样的「读环境变量 → clamp → 回退画像」逻辑，而本函数早已存在。
+ */
+export function resolveVitestMaxWorkers(): number {
+  const envRaw = process.env.ZH_VITEST_MAX_WORKERS;
+  const envMax = envRaw ? Number.parseInt(envRaw, 10) : Number.NaN;
+  if (Number.isFinite(envMax)) {
+    return clamp(envMax, 1, 4);
+  }
+  return detectMachineProfile().vitestMaxWorkers;
+}
+
+/**
  * 探测当前机器并推导各环节并发预算。
  * 依据文档《智汇码盾AutoPerf自动化性能优化方案》P0-1/MachineProfile：
  * 4 核 8GB 机型 → turbo --concurrency=1 · 适配器并行度 2 · vitest maxWorkers=2。

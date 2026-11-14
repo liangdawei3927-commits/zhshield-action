@@ -10,6 +10,7 @@ import type { EngineHost } from './evaluator-host';
 import { skipEvaluation } from './evaluation-builders';
 import { toMessage, errorResult } from './dispatch-shared';
 import { evalToolDispatch } from './dispatch-tool-scan';
+import { isGuardConclusionMode } from './dispatch-guard-conclusion';
 
 // ─── 派发评估：scanner-dispatch → 具名工具 / InspectEngine ──────
 
@@ -57,6 +58,22 @@ async function scanWithOneScanner(
   toolName: string,
   context: RuleContext,
 ): Promise<ScannerOutcome> {
+  // 结论模式（O8）先于「适配器是否注册」判定：门禁此时**不启动任何工具**，只读
+  // Owner 域的既有结论，因此「本域没注册这个工具的适配器」与判定无关。
+  //
+  // 顺序颠倒的代价是实测过的（2026-11-14）：规则声明 scanners: ['semgrep','gitleaks']、
+  // 宿主只注册了 eslint 时，两个 scanner 都被下面的「未注册」分支吃掉 → anyRan=false →
+  // 整条规则判 skipped，于是**门禁静默丢掉跨域阻断项**——正是 delegationGate 注释里
+  // 「若也让位，门禁会静默丢掉跨域阻断项」刻意防范的那种失效。
+  if (isGuardConclusionMode(rule, context)) {
+    const one = await evalToolDispatch(
+      host,
+      rule,
+      { type: 'tool-dispatch', tool: toolName, toolConfig: {}, conditions: {}, judgment: {}, fix: {} },
+      context,
+    );
+    return scannerOutcomeOf(toolName, one);
+  }
   // 未注册的扫描器不再静默跳过：计入原因汇总，避免「工具缺失 = 未检测」被误报为通过
   if (!host.toolAdapters.has(toolName)) {
     return { ran: false, violations: [], reason: `${toolName}(未注册工具适配器: ${toolName})` };
@@ -74,6 +91,11 @@ async function scanWithOneScanner(
     },
     context,
   );
+  return scannerOutcomeOf(toolName, one);
+}
+
+/** 把一次 evalToolDispatch 的结果收敛成 ScannerOutcome（结论模式与常规派发共用，口径一致） */
+function scannerOutcomeOf(toolName: string, one: RuleEvaluation): ScannerOutcome {
   const violations = one.violations ?? [];
   if (one.status === 'error' && violations.length === 0) {
     return {

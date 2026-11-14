@@ -9,7 +9,7 @@
  * ScoringEngine.calculate），差别只在数据来源：pipeline 吃刚跑完的报告，
  * 汇总吃各域已持久化的结果。因此需要「落盘结果 → 算法输入形状」的映射，即本模块职责。
  */
-import { buildHealthDimensions, isPenaltyExemptRuleId, SCORE_VERSION } from '@zh/scoring';
+import { isPenaltyExemptRuleId } from '@zh/scoring';
 import type { GuardCheckLike, GuardReportLike, InspectIssueLike } from '@zh/scoring';
 import type { GuardReportRecord } from '@zh/guard';
 import type { DiagnosticEntry, DiagnosticSource, DiagnosticsReport } from './zh-diagnostics';

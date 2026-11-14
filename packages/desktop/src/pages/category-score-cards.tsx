@@ -1,4 +1,3 @@
-import type { ScoreDimension } from '@zh/shared';
 import { useT } from '../i18n';
 import { useNavigation } from '../contexts/NavigationContext';
 import { ResultCard } from '../components/ui/ResultCard';

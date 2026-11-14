@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { scoreToGrade } from '@zh/shared';
 import type { DimensionScore, HealthScore } from './types';
 import type { GuardCheckLike, InspectIssueLike } from './pipeline-score';
 import type { ScoringProjectProfile, ProjectType, ModuleProfile } from '@zh/fingerprint';
@@ -79,10 +80,7 @@ function moduleToProfile(m: ModuleProfile, absPath: string): ScoringProjectProfi
 }
 
 function gradeOf(score: number): HealthScore['grade'] {
-  if (score >= 90) return 'A';
-  if (score >= 75) return 'B';
-  if (score >= 60) return 'C';
-  return 'D';
+  return scoreToGrade(score);
 }
 
 /**

@@ -41,7 +41,13 @@ export function parseTsPruneOutput(raw: string): PruneEntry[] {
     .filter((e): e is PruneEntry => e !== null);
 }
 
-function asStringArray(value: unknown): string[] {
+/**
+ * 把规则 `toolConfig` 里的未知值收窄成 string[]。
+ *
+ * 唯一实现在本文件：overlay 侧此前另抄了一份同样的谓词。配置来自不可信的
+ * SOP 规则声明，非字符串项要静默丢弃而非抛错（漏配规则 ≠ 扫描失败）。
+ */
+export function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
 }
 

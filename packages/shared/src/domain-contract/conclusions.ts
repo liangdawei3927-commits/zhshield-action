@@ -10,21 +10,21 @@
  *   · 缺结论（供应商域本次未运行）→ 门禁跳过该项，**不得判通过**（C4）。
  *   · `toolError` 条目是 Owner 域的工具执行失败，不是代码问题，门禁不得据此判失败。
  */
-import type { IssueSeverity } from '../types';
 import { findToolCapability } from './capability-registry';
 import { resolveOwnerId } from './ownership-registry';
-import type { DomainId } from './types';
+import type { DomainId, DomainIssue } from './types';
 
-/** 一条只读结论（Owner 域报告中的问题条目，字段与 `DomainIssue` 对齐） */
-export interface ConclusionIssue {
-  ruleId: string;
-  severity: IssueSeverity;
-  /** 相对项目根的文件路径 */
-  file: string;
-  line?: number;
-  column?: number;
-  message: string;
-  suggestion?: string;
+/**
+ * 一条只读结论（Owner 域报告中的问题条目）。
+ *
+ * 字段从 {@link DomainIssue} 派生，只去掉门禁拿不到也不需要的那两项：
+ *   · `owner` —— 结论快照本身按域分组（见 {@link DomainConclusion.domain}），逐条再带是冗余；
+ *   · `fingerprint` —— 由 Owner 域自己维护去重，只读副本用不到。
+ *
+ * 此前这里把 6 个字段手抄了一遍，注释还写着「字段与 DomainIssue 对齐」——
+ * 对齐靠人记，`DomainIssue` 加字段时这里不会跟着变，类型悄悄分叉也不报错。
+ */
+export interface ConclusionIssue extends Omit<DomainIssue, 'owner' | 'fingerprint'> {
   /** Owner 域标记的工具执行失败条目：不是代码问题，门禁不得据此判定失败 */
   toolError?: boolean;
 }

@@ -14,6 +14,7 @@ import {
 import { AdapterRunner } from './adapter-runner';
 import { ToolAdapterExecutor } from './tool-adapter-executor';
 import { ScanReportBuilder } from './scan-report-builder';
+import type { ScanReportInput } from './scan-report-builder';
 import { SopReportMapper } from './sop-report-mapper';
 import { AiCodeReviewImpl } from './ai-code/review';
 import type { AiCodeVuln } from './ai-code/types';
@@ -58,16 +59,21 @@ interface BuildSopReportParams {
   sopReport: RuleEngineReport;
 }
 
-/** InspectEngine.finalizeScan 的执行参数（直扫 / SOP 两分支共用的报告收尾） */
-interface FinalizeScanParams {
-  projectId: string;
-  scanType: InspectionReport['scanType'];
+/**
+ * InspectEngine.finalizeScan 的执行参数（直扫 / SOP 两分支共用的报告收尾）。
+ *
+ * 与报告入参重合的 4 项直接从 {@link ScanReportInput} 取，不再各写一遍：
+ * finalizeScan 干的正是把这几个字段原样交给 reportBuilder.buildReport，
+ * 两边各声明一次的话，`ScanReportInput` 改字段名/加字段时这里会静默不跟随。
+ * 其余字段是本阶段独有（起始时间、基线、过滤前全集），故单独列出。
+ */
+interface FinalizeScanParams
+  extends Pick<ScanReportInput, 'projectId' | 'scanType' | 'adapterResults' | 'penalizeInfo'> {
+  /** 扫描起始时间戳（ms）：报告耗时 = Date.now() - start */
   start: number;
   baseline: Baseline | null | undefined;
+  /** 基线过滤前的问题全集；报告里落的是过滤后的 kept */
   allIssues: Issue[];
-  adapterResults: AdapterResult[];
-  /** SOP 分支不惩罚 info 级问题；缺省即惩罚（直扫原行为） */
-  penalizeInfo?: boolean;
 }
 
 /**

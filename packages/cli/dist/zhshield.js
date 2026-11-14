@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// @zh-src-hash: bbd86ea445aa36a5
-// @zh-src-files: 433
+// @zh-src-hash: ee6be4f6c26f65f6
+// @zh-src-files: 434
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
 var __create = Object.create;
@@ -16271,6 +16271,21 @@ var init_types2 = __esm({
   }
 });
 
+// ../shared/src/score-grade.ts
+function scoreToGrade(score) {
+  if (score >= 90) return "A";
+  if (score >= 75) return "B";
+  if (score >= 60) return "C";
+  return "D";
+}
+var GRADE_ORDER;
+var init_score_grade = __esm({
+  "../shared/src/score-grade.ts"() {
+    "use strict";
+    GRADE_ORDER = ["A", "B", "C", "D"];
+  }
+});
+
 // ../shared/src/dimension-mapper.ts
 function getToolDimensions(toolId) {
   return TOOL_DIMENSION_MAP[toolId] ?? ["quality"];
@@ -16315,16 +16330,11 @@ function computeOverallScore(dimensions) {
   const totalWeight = dimensions.reduce((sum, d) => sum + d.weight, 0);
   return totalWeight > 0 ? Math.round(weighted / totalWeight * 100) / 100 : 100;
 }
-function scoreToGrade(score) {
-  if (score >= 90) return "A";
-  if (score >= 75) return "B";
-  if (score >= 60) return "C";
-  return "D";
-}
 var TOOL_DIMENSION_MAP, CATEGORY_WEIGHTS;
 var init_dimension_mapper = __esm({
   "../shared/src/dimension-mapper.ts"() {
     "use strict";
+    init_score_grade();
     TOOL_DIMENSION_MAP = {
       eslint: ["quality", "performance", "documentation"],
       semgrep: ["security"],
@@ -17904,6 +17914,7 @@ __export(src_exports, {
   ESLINT_CONFIG_NAMES: () => ESLINT_CONFIG_NAMES,
   EXECUTION_MODES: () => EXECUTION_MODES,
   GOVERNANCE_DOMAINS: () => GOVERNANCE_DOMAINS,
+  GRADE_ORDER: () => GRADE_ORDER,
   HEALTH_SCORE_DIMENSIONS: () => HEALTH_SCORE_DIMENSIONS,
   INSPECT_SCOPE_DOMAINS: () => INSPECT_SCOPE_DOMAINS,
   MAX_LOG_FIELD_LENGTH: () => MAX_LOG_FIELD_LENGTH,
@@ -18074,6 +18085,7 @@ var init_src2 = __esm({
     init_garbage_scan();
     init_manifest_parsers();
     init_score_dimensions();
+    init_score_grade();
     VERSION = "0.1.0";
   }
 });
@@ -83355,7 +83367,7 @@ var require_Obj = __commonJS({
 var require_Str = __commonJS({
   "../../node_modules/.pnpm/prelude-ls@1.2.1/node_modules/prelude-ls/lib/Str.js"(exports2, module2) {
     var split;
-    var join56;
+    var join55;
     var lines;
     var unlines;
     var words;
@@ -83370,7 +83382,7 @@ var require_Str = __commonJS({
     split = curry$(function(sep14, str) {
       return str.split(sep14);
     });
-    join56 = curry$(function(sep14, xs) {
+    join55 = curry$(function(sep14, xs) {
       return xs.join(sep14);
     });
     lines = function(str) {
@@ -83429,7 +83441,7 @@ var require_Str = __commonJS({
     };
     module2.exports = {
       split,
-      join: join56,
+      join: join55,
       lines,
       unlines,
       words,
@@ -91702,7 +91714,7 @@ var require_posix = __commonJS({
       if (isAbsolute13) return `/${path83}`;
       return path83;
     }
-    function join56(path83, ...paths) {
+    function join55(path83, ...paths) {
       if (path83 === void 0) return ".";
       if (path83 instanceof URL) {
         path83 = fromFileUrl(path83);
@@ -92180,7 +92192,7 @@ var require_posix = __commonJS({
     function joinGlobs(globs, options2 = {}) {
       const { globstar = false } = options2;
       if (!globstar || globs.length === 0) {
-        return join56(...globs);
+        return join55(...globs);
       }
       let joined;
       for (const glob of globs) {
@@ -92207,7 +92219,7 @@ var require_posix = __commonJS({
     exports2.globToRegExp = globToRegExp3;
     exports2.isAbsolute = isAbsolute12;
     exports2.isGlob = isGlob;
-    exports2.join = join56;
+    exports2.join = join55;
     exports2.joinGlobs = joinGlobs;
     exports2.normalize = normalize;
     exports2.normalizeGlob = normalizeGlob;
@@ -92607,7 +92619,7 @@ var require_windows = __commonJS({
       }
       return device + tail;
     }
-    function join56(path83, ...paths) {
+    function join55(path83, ...paths) {
       if (path83 instanceof URL) {
         path83 = fromFileUrl(path83);
       }
@@ -93253,7 +93265,7 @@ var require_windows = __commonJS({
     function joinGlobs(globs, options2 = {}) {
       const { globstar = false } = options2;
       if (!globstar || globs.length === 0) {
-        return join56(...globs);
+        return join55(...globs);
       }
       let joined;
       for (const glob of globs) {
@@ -93280,7 +93292,7 @@ var require_windows = __commonJS({
     exports2.globToRegExp = globToRegExp3;
     exports2.isAbsolute = isAbsolute12;
     exports2.isGlob = isGlob;
-    exports2.join = join56;
+    exports2.join = join55;
     exports2.joinGlobs = joinGlobs;
     exports2.normalize = normalize;
     exports2.normalizeGlob = normalizeGlob;
@@ -126622,7 +126634,7 @@ var require_util2 = __commonJS({
       return path83;
     }
     exports2.normalize = normalize;
-    function join56(aRoot, aPath) {
+    function join55(aRoot, aPath) {
       if (aRoot === "") {
         aRoot = ".";
       }
@@ -126654,7 +126666,7 @@ var require_util2 = __commonJS({
       }
       return joined;
     }
-    exports2.join = join56;
+    exports2.join = join55;
     exports2.isAbsolute = function(aPath) {
       return aPath.charAt(0) === "/" || urlRegexp.test(aPath);
     };
@@ -126827,7 +126839,7 @@ var require_util2 = __commonJS({
             parsed.path = parsed.path.substring(0, index + 1);
           }
         }
-        sourceURL = join56(urlGenerate(parsed), sourceURL);
+        sourceURL = join55(urlGenerate(parsed), sourceURL);
       }
       return normalize(sourceURL);
     }
@@ -363816,7 +363828,7 @@ var require_rule62 = __commonJS({
       }),
       create(context) {
         const forLoopStack = [];
-        function join56(expressions) {
+        function join55(expressions) {
           return expressions.map((expr) => context.sourceCode.getText(expr)).join(", ");
         }
         function isInsideUpdate(node) {
@@ -363855,8 +363867,8 @@ var require_rule62 = __commonJS({
                 loc: context.sourceCode.getFirstToken(forInfo.forLoop).loc,
                 messageId: "misplacedCounter",
                 data: {
-                  test: join56(forInfo.testedExpressions),
-                  update: join56(forInfo.updatedExpressions)
+                  test: join55(forInfo.testedExpressions),
+                  update: join55(forInfo.updatedExpressions)
                 }
               });
             }
@@ -500171,10 +500183,24 @@ var init_vulnerability_scanner = __esm({
 });
 
 // ../security/src/scan-walk.ts
+function walkSourceTree(dir2, visitFile, depth = 0) {
+  if (depth > MAX_SCAN_DEPTH2) return;
+  for (const entry of safeReadDirEntries(dir2)) {
+    const fullPath = safeJoin(dir2, entry.name);
+    if (entry.isDirectory()) {
+      if (SKIP_DIRS2.has(entry.name)) continue;
+      walkSourceTree(fullPath, visitFile, depth + 1);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    visitFile(fullPath, entry.name);
+  }
+}
 var SKIP_DIRS2, MAX_SCAN_DEPTH2, PACKAGE_JSON_FILE;
 var init_scan_walk = __esm({
   "../security/src/scan-walk.ts"() {
     "use strict";
+    init_src2();
     SKIP_DIRS2 = /* @__PURE__ */ new Set([
       "node_modules",
       ".git",
@@ -500224,7 +500250,6 @@ var init_malware_scanner = __esm({
     import_crypto = require("crypto");
     fs52 = __toESM(require("fs"));
     path54 = __toESM(require("path"));
-    init_src2();
     init_scan_walk();
     MALWARE_PATTERN = /backdoor|eval|exfil|malware|shell|ransomware|supply.?chain|obfuscat/;
     SCRIPT_FILE_EXT = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
@@ -500303,7 +500328,11 @@ var init_malware_scanner = __esm({
     MalwareScanner = class {
       async scan(projectPath) {
         const items = [];
-        this.walk(projectPath, 0, projectPath, items);
+        walkSourceTree(projectPath, (fullPath, fileName) => {
+          if (SCRIPT_FILE_EXT.test(fileName) || fileName === PACKAGE_JSON_FILE) {
+            this.scanFile(fullPath, projectPath, items);
+          }
+        });
         return items;
       }
       scanFile(filePath, projectPath, items) {
@@ -500337,21 +500366,6 @@ var init_malware_scanner = __esm({
             });
           }
           pattern.lastIndex = 0;
-        }
-      }
-      walk(dir2, depth, projectPath, items) {
-        if (depth > MAX_SCAN_DEPTH2) return;
-        for (const entry of safeReadDirEntries(dir2)) {
-          const fullPath = safeJoin(dir2, entry.name);
-          if (entry.isDirectory()) {
-            if (SKIP_DIRS2.has(entry.name)) continue;
-            this.walk(fullPath, depth + 1, projectPath, items);
-            continue;
-          }
-          if (!entry.isFile()) continue;
-          if (SCRIPT_FILE_EXT.test(entry.name) || entry.name === "package.json") {
-            this.scanFile(fullPath, projectPath, items);
-          }
         }
       }
     };
@@ -501983,27 +501997,11 @@ var init_injection_guard = __esm({
     InjectionGuard = class {
       async scan(projectPath) {
         const items = [];
-        this.walk(projectPath, 0, projectPath, items);
+        walkSourceTree(
+          projectPath,
+          (fullPath, fileName) => this.scanFile(fullPath, fileName, projectPath, items)
+        );
         return items;
-      }
-      walk(dir2, depth, projectPath, items) {
-        if (depth > MAX_SCAN_DEPTH2) return;
-        let entries;
-        try {
-          entries = fs57.readdirSync(dir2, { withFileTypes: true });
-        } catch {
-          return;
-        }
-        for (const entry of entries) {
-          const fullPath = path60.join(dir2, entry.name);
-          if (entry.isDirectory()) {
-            if (SKIP_DIRS2.has(entry.name)) continue;
-            this.walk(fullPath, depth + 1, projectPath, items);
-            continue;
-          }
-          if (!entry.isFile()) continue;
-          this.scanFile(fullPath, entry.name, projectPath, items);
-        }
       }
       scanFile(filePath, fileName, projectPath, items) {
         if (isEnvFile(fileName)) {
@@ -502872,6 +502870,14 @@ function levenshtein(a, b) {
   }
   return prev[n] ?? m;
 }
+function typosquatThreatItem(filePath, name, popular, distance) {
+  return makeThreatItem(filePath, name, {
+    severity: "high",
+    title: "\u7591\u4F3C\u4EFF\u5192\u5305\uFF08typosquatting\uFF09",
+    pattern: `typosquat:${popular}:${distance}`,
+    evidence: `\u5305\u540D ${name} \u4E0E\u6D41\u884C\u5305 ${popular} \u7F16\u8F91\u8DDD\u79BB\u4E3A ${distance}`
+  });
+}
 function makeThreatItem(filePath, name, meta) {
   return {
     id: (0, import_crypto3.randomUUID)(),
@@ -502996,14 +503002,7 @@ function scanPackageNames(names, lockPath) {
     for (const popular of KNOWN_POPULAR_PACKAGES) {
       const distance = levenshtein(short, popular);
       if (distance >= 1 && distance <= threshold) {
-        items.push(
-          makeThreatItem(lockPath, name, {
-            severity: "high",
-            title: "\u7591\u4F3C\u4EFF\u5192\u5305\uFF08typosquatting\uFF09",
-            pattern: `typosquat:${popular}:${distance}`,
-            evidence: `\u5305\u540D ${name} \u4E0E\u6D41\u884C\u5305 ${popular} \u7F16\u8F91\u8DDD\u79BB\u4E3A ${distance}`
-          })
-        );
+        items.push(typosquatThreatItem(lockPath, name, popular, distance));
         break;
       }
     }
@@ -512177,6 +512176,7 @@ var ToolAdapterExecutor = class _ToolAdapterExecutor {
 };
 
 // ../inspect/src/scan-report-builder.ts
+init_src2();
 var SCAN_CATEGORIES = [
   "architecture",
   "security",
@@ -512190,7 +512190,7 @@ function isNotExecuted(result) {
   return result.degraded === true || result.status === "error" || result.status === "unavailable";
 }
 function gradeOf(overall) {
-  return overall >= 90 ? "A" : overall >= 75 ? "B" : overall >= 60 ? "C" : "D";
+  return scoreToGrade(overall);
 }
 function isOutOfScope(result) {
   return result.status === "skipped" && result.skipReason === "out-of-scope";
@@ -517249,9 +517249,229 @@ var fs37 = __toESM(require("node:fs"));
 var path39 = __toESM(require("node:path"));
 
 // ../inspect/src/adapters/ts-prune-adapter-overlay.ts
+var fs36 = __toESM(require("node:fs"));
+var path38 = __toESM(require("node:path"));
+init_src2();
+
+// ../inspect/src/adapters/ts-prune-adapter-core.ts
 var fs35 = __toESM(require("node:fs"));
 var path37 = __toESM(require("node:path"));
-init_src2();
+var TS_PRUNE_DASH_LINE = /^(.+?):(\d+)\s+-\s+(.+)$/;
+var TS_PRUNE_COLON_LINE = /^(.+?):(\d+):\s*(.+)$/;
+var USED_IN_MODULE = /\s*\(used in module\)\s*$/;
+function parsePruneLine(rawLine) {
+  const trimmed = rawLine.trim();
+  if (!trimmed) return null;
+  const match = trimmed.match(TS_PRUNE_DASH_LINE) ?? trimmed.match(TS_PRUNE_COLON_LINE);
+  if (!match) return null;
+  const [, file, lineStr, rawSymbol] = match;
+  if (USED_IN_MODULE.test(rawSymbol)) return null;
+  const symbol = rawSymbol.replace(USED_IN_MODULE, "").trim();
+  if (!symbol) return null;
+  return { file: file.trim(), line: parseInt(lineStr, 10) || 0, symbol };
+}
+function parseTsPruneOutput(raw) {
+  if (!raw || !raw.trim()) return [];
+  return raw.split("\n").map((line) => parsePruneLine(line)).filter((e) => e !== null);
+}
+function asStringArray(value) {
+  return Array.isArray(value) ? value.filter((v) => typeof v === "string") : [];
+}
+function joinRegexes(patterns) {
+  return patterns.length === 1 ? patterns[0] : `(${patterns.join("|")})`;
+}
+function buildTsPruneArgs(options2, tsConfigPath) {
+  const args = ["-p", tsConfigPath];
+  const cfg = options2.config ?? {};
+  const skip = asStringArray(cfg.skip);
+  if (skip.length > 0) args.push("-s", joinRegexes(skip));
+  const ignore = asStringArray(cfg.ignore);
+  if (ignore.length > 0) args.push("-i", joinRegexes(ignore));
+  return args;
+}
+var MAX_RE_EXPORT_BLOCK_LINES = 300;
+var RE_EXPORT_HEAD = /^\s*export\s+(type\s+)?(\*|\{)/;
+var RE_LOCAL_DEFINITION_HEAD = /^\s*export\s+(default\b|function\b|async\b|class\b|abstract\b|const\b|let\b|var\b|interface\b|enum\b|declare\b|type\s+[A-Za-z_$])/;
+var RE_FROM_CLAUSE = /\bfrom\s+['"]/;
+var RE_TYPE_PREFIX = /^type\s+/;
+var RE_AS_ALIAS = /\sas\s+([A-Za-z_$][\w$]*)$/;
+var RE_LINE_BREAK = /\r?\n/;
+var statementCache = /* @__PURE__ */ new Map();
+function extractExportedNames(statement) {
+  const names = /* @__PURE__ */ new Set();
+  const braceStart = statement.indexOf("{");
+  const braceEnd = statement.lastIndexOf("}");
+  if (braceStart < 0 || braceEnd <= braceStart) return names;
+  for (const part of statement.slice(braceStart + 1, braceEnd).split(",")) {
+    let name = part.replace(/\s+/g, " ").trim();
+    if (!name) continue;
+    name = name.replace(RE_TYPE_PREFIX, "");
+    const alias = name.match(RE_AS_ALIAS);
+    names.add(alias ? alias[1] : name);
+  }
+  return names;
+}
+function collectReExportStatements(absPath) {
+  const cached = statementCache.get(absPath);
+  if (cached !== void 0) return cached;
+  let text;
+  try {
+    text = fs35.readFileSync(absPath, "utf8");
+  } catch {
+    statementCache.set(absPath, null);
+    return null;
+  }
+  const lines = text.split(RE_LINE_BREAK);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const head = lines[i];
+    if (!RE_EXPORT_HEAD.test(head) || RE_LOCAL_DEFINITION_HEAD.test(head)) continue;
+    let end = -1;
+    const limit = Math.min(lines.length, i + MAX_RE_EXPORT_BLOCK_LINES);
+    for (let j = i; j < limit; j++) {
+      if (RE_FROM_CLAUSE.test(lines[j])) {
+        end = j;
+        break;
+      }
+      if (j > i && RE_EXPORT_HEAD.test(lines[j])) break;
+    }
+    if (end < 0) continue;
+    out.push({
+      startLine: i + 1,
+      endLine: end + 1,
+      names: extractExportedNames(lines.slice(i, end + 1).join("\n"))
+    });
+    i = end;
+  }
+  statementCache.set(absPath, out);
+  return out;
+}
+function filterReExportEdges(entries, projectRoot) {
+  const kept = [];
+  const dropped = [];
+  for (const entry of entries) {
+    const absPath = path37.isAbsolute(entry.file) ? entry.file : path37.resolve(projectRoot, entry.file);
+    const statements = collectReExportStatements(absPath);
+    if (statements === null) {
+      kept.push(entry);
+      continue;
+    }
+    const isEdge = statements.some(
+      (s) => entry.line >= s.startLine && entry.line <= s.endLine && s.names.has(entry.symbol)
+    );
+    (isEdge ? dropped : kept).push(entry);
+  }
+  return { kept, dropped };
+}
+var INLINE_IMPORT_TYPE_REF = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)\s*\.\s*([A-Za-z_$][\w$]*)/;
+var INLINE_REF_EXCLUDED_DIRS = /* @__PURE__ */ new Set([
+  "node_modules",
+  "dist",
+  "build",
+  "coverage",
+  "out",
+  "release",
+  ".turbo",
+  ".next"
+]);
+var INLINE_REF_SOURCE_EXT = /* @__PURE__ */ new Set([".ts", ".tsx", ".mts", ".cts"]);
+var INLINE_REF_MAX_BYTES = 2 * 1024 * 1024;
+var INLINE_REF_MAX_FILES = 5e4;
+function resolveRelativeModuleFile(fromFile, specifier) {
+  if (!specifier.startsWith(".")) return null;
+  const base = path37.resolve(path37.dirname(fromFile), specifier);
+  const ext = path37.extname(base);
+  const stem = ext ? base.slice(0, -ext.length) : base;
+  const candidates = [
+    base,
+    `${stem}.ts`,
+    `${stem}.tsx`,
+    `${stem}.mts`,
+    `${stem}.cts`,
+    path37.join(base, "index.ts"),
+    path37.join(base, "index.tsx")
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs35.statSync(candidate).isFile()) return candidate;
+    } catch {
+    }
+  }
+  return null;
+}
+function collectInlineRefCandidates(dir2, out, limit) {
+  if (out.length >= limit) return false;
+  let entries;
+  try {
+    entries = fs35.readdirSync(dir2, { withFileTypes: true });
+  } catch {
+    return true;
+  }
+  for (const entry of entries) {
+    if (out.length >= limit) return false;
+    if (entry.name.startsWith(".")) continue;
+    const abs = path37.join(dir2, entry.name);
+    if (entry.isDirectory()) {
+      if (INLINE_REF_EXCLUDED_DIRS.has(entry.name)) continue;
+      if (!collectInlineRefCandidates(abs, out, limit)) return false;
+      continue;
+    }
+    if (entry.isFile() && INLINE_REF_SOURCE_EXT.has(path37.extname(entry.name))) out.push(abs);
+  }
+  return true;
+}
+function toAbsolute(file, projectRoot) {
+  return path37.isAbsolute(file) ? file : path37.resolve(projectRoot, file);
+}
+function collectTargetSymbols(entries, projectRoot) {
+  const targets = /* @__PURE__ */ new Map();
+  for (const entry of entries) {
+    const abs = toAbsolute(entry.file, projectRoot);
+    const set = targets.get(abs);
+    if (set) set.add(entry.symbol);
+    else targets.set(abs, /* @__PURE__ */ new Set([entry.symbol]));
+  }
+  return targets;
+}
+function collectInlineRefsFromFile(file, targets, referenced) {
+  let text;
+  try {
+    if (fs35.statSync(file).size > INLINE_REF_MAX_BYTES) return;
+    text = fs35.readFileSync(file, "utf8");
+  } catch {
+    return;
+  }
+  const re = new RegExp(INLINE_IMPORT_TYPE_REF.source, "g");
+  for (const match of text.matchAll(re)) {
+    const specifier = match[1];
+    const symbol = match[2];
+    if (!specifier || !symbol) continue;
+    const target = resolveRelativeModuleFile(file, specifier);
+    if (target === null) continue;
+    const symbols = targets.get(target);
+    if (!symbols || !symbols.has(symbol)) continue;
+    referenced.add(`${target}\0${symbol}`);
+  }
+}
+function filterInlineImportTypeRefs(entries, projectRoot) {
+  if (entries.length === 0) return { kept: [], dropped: [], degraded: false };
+  const targets = collectTargetSymbols(entries, projectRoot);
+  const files = [];
+  if (!collectInlineRefCandidates(projectRoot, files, INLINE_REF_MAX_FILES)) {
+    return { kept: [...entries], dropped: [], degraded: true };
+  }
+  const referenced = /* @__PURE__ */ new Set();
+  for (const file of files) collectInlineRefsFromFile(file, targets, referenced);
+  const kept = [];
+  const dropped = [];
+  for (const entry of entries) {
+    const abs = toAbsolute(entry.file, projectRoot);
+    (referenced.has(`${abs}\0${entry.symbol}`) ? dropped : kept).push(entry);
+  }
+  return { kept, dropped, degraded: false };
+}
+
+// ../inspect/src/adapters/ts-prune-adapter-overlay.ts
 var MONOREPO_OVERLAY_FILE = ".zhshield/tsconfig.ts-prune.monorepo.json";
 var SRC_TESTS_EXCLUDE_RE = /(^|\/)src\/__tests__\/?$/;
 var OVERLAY_COMPILER_OPTIONS = {
@@ -517306,8 +517526,8 @@ function stripJsoncComments(raw) {
   }
   return out;
 }
-function buildMonorepoPruneOverlay(projectPath, readFile7 = (p) => fs35.readFileSync(p, "utf8"), exists2 = fs35.existsSync) {
-  const packagesRoot = path37.join(projectPath, "packages");
+function buildMonorepoPruneOverlay(projectPath, readFile7 = (p) => fs36.readFileSync(p, "utf8"), exists2 = fs36.existsSync) {
+  const packagesRoot = path38.join(projectPath, "packages");
   const pkgDirs = readPackageDirs(packagesRoot);
   if (pkgDirs === null) return null;
   const { relRoot, fromConfigDir, fromBaseUrl } = createOverlayPathHelpers(projectPath);
@@ -517323,16 +517543,16 @@ function buildMonorepoPruneOverlay(projectPath, readFile7 = (p) => fs35.readFile
 }
 function readPackageDirs(packagesRoot) {
   try {
-    return fs35.readdirSync(packagesRoot, { withFileTypes: true });
+    return fs36.readdirSync(packagesRoot, { withFileTypes: true });
   } catch {
     return null;
   }
 }
 function createOverlayPathHelpers(projectPath) {
-  const overlayDir = path37.dirname(path37.join(projectPath, MONOREPO_OVERLAY_FILE));
-  const relRoot = (path37.relative(overlayDir, projectPath) || ".").split(path37.sep).join("/");
-  const fromConfigDir = (p) => path37.posix.join(relRoot, p);
-  const fromBaseUrl = (p) => `./${path37.posix.normalize(p)}`;
+  const overlayDir = path38.dirname(path38.join(projectPath, MONOREPO_OVERLAY_FILE));
+  const relRoot = (path38.relative(overlayDir, projectPath) || ".").split(path38.sep).join("/");
+  const fromConfigDir = (p) => path38.posix.join(relRoot, p);
+  const fromBaseUrl = (p) => `./${path38.posix.normalize(p)}`;
   return { relRoot, fromConfigDir, fromBaseUrl };
 }
 function collectPackageOverlay(pkgDirs, params) {
@@ -517348,7 +517568,7 @@ function collectPackageOverlay(pkgDirs, params) {
   for (const dirent of pkgDirs) {
     if (!dirent.isDirectory()) continue;
     const pkg = dirent.name;
-    const pkgTsConfig = path37.join(packagesRoot, pkg, "tsconfig.json");
+    const pkgTsConfig = path38.join(packagesRoot, pkg, "tsconfig.json");
     if (!exists2(pkgTsConfig)) continue;
     foundPackage = true;
     aggregatePackage(pkg, {
@@ -517365,7 +517585,7 @@ function collectPackageOverlay(pkgDirs, params) {
 }
 function aggregatePackage(pkg, params) {
   const { packagesRoot, readFile: readFile7, include, exclude, paths, fromConfigDir, fromBaseUrl } = params;
-  const pkgTsConfig = path37.join(packagesRoot, pkg, "tsconfig.json");
+  const pkgTsConfig = path38.join(packagesRoot, pkg, "tsconfig.json");
   const cfg = parsePackageTsConfig(pkgTsConfig, readFile7);
   if (cfg === null) return;
   aggregatePackageIncludes(pkg, { cfg, include, exclude, fromConfigDir });
@@ -517413,248 +517633,27 @@ function assembleOverlay(relRoot, paths, include, exclude) {
     exclude: sortedExclude
   };
 }
-function asStringArray(value) {
-  return Array.isArray(value) ? value.filter((v) => typeof v === "string") : [];
-}
 async function writeOverlayFile(overlay, overlayAbsPath) {
   if (!overlay) return;
-  await fs35.promises.mkdir(path37.dirname(overlayAbsPath), { recursive: true });
-  await fs35.promises.writeFile(overlayAbsPath, JSON.stringify(overlay, null, 2), "utf8");
+  await fs36.promises.mkdir(path38.dirname(overlayAbsPath), { recursive: true });
+  await fs36.promises.writeFile(overlayAbsPath, JSON.stringify(overlay, null, 2), "utf8");
 }
 async function cleanupOverlay(overlay, overlayAbsPath) {
   if (!overlay) return;
-  await fs35.promises.rm(overlayAbsPath, { force: true }).catch(() => {
+  await fs36.promises.rm(overlayAbsPath, { force: true }).catch(() => {
   });
 }
 async function findExecutableOnPath(command) {
   const pathEnv = process.env.PATH ?? "";
-  for (const dir2 of pathEnv.split(path37.delimiter)) {
+  for (const dir2 of pathEnv.split(path38.delimiter)) {
     if (!dir2) continue;
     try {
-      await fs35.promises.access(safeJoin(dir2, command), fs35.constants.X_OK);
+      await fs36.promises.access(safeJoin(dir2, command), fs36.constants.X_OK);
       return true;
     } catch {
     }
   }
   return false;
-}
-
-// ../inspect/src/adapters/ts-prune-adapter-core.ts
-var fs36 = __toESM(require("node:fs"));
-var path38 = __toESM(require("node:path"));
-var TS_PRUNE_DASH_LINE = /^(.+?):(\d+)\s+-\s+(.+)$/;
-var TS_PRUNE_COLON_LINE = /^(.+?):(\d+):\s*(.+)$/;
-var USED_IN_MODULE = /\s*\(used in module\)\s*$/;
-function parsePruneLine(rawLine) {
-  const trimmed = rawLine.trim();
-  if (!trimmed) return null;
-  const match = trimmed.match(TS_PRUNE_DASH_LINE) ?? trimmed.match(TS_PRUNE_COLON_LINE);
-  if (!match) return null;
-  const [, file, lineStr, rawSymbol] = match;
-  if (USED_IN_MODULE.test(rawSymbol)) return null;
-  const symbol = rawSymbol.replace(USED_IN_MODULE, "").trim();
-  if (!symbol) return null;
-  return { file: file.trim(), line: parseInt(lineStr, 10) || 0, symbol };
-}
-function parseTsPruneOutput(raw) {
-  if (!raw || !raw.trim()) return [];
-  return raw.split("\n").map((line) => parsePruneLine(line)).filter((e) => e !== null);
-}
-function asStringArray2(value) {
-  return Array.isArray(value) ? value.filter((v) => typeof v === "string") : [];
-}
-function joinRegexes(patterns) {
-  return patterns.length === 1 ? patterns[0] : `(${patterns.join("|")})`;
-}
-function buildTsPruneArgs(options2, tsConfigPath) {
-  const args = ["-p", tsConfigPath];
-  const cfg = options2.config ?? {};
-  const skip = asStringArray2(cfg.skip);
-  if (skip.length > 0) args.push("-s", joinRegexes(skip));
-  const ignore = asStringArray2(cfg.ignore);
-  if (ignore.length > 0) args.push("-i", joinRegexes(ignore));
-  return args;
-}
-var MAX_RE_EXPORT_BLOCK_LINES = 300;
-var RE_EXPORT_HEAD = /^\s*export\s+(type\s+)?(\*|\{)/;
-var RE_LOCAL_DEFINITION_HEAD = /^\s*export\s+(default\b|function\b|async\b|class\b|abstract\b|const\b|let\b|var\b|interface\b|enum\b|declare\b|type\s+[A-Za-z_$])/;
-var RE_FROM_CLAUSE = /\bfrom\s+['"]/;
-var RE_TYPE_PREFIX = /^type\s+/;
-var RE_AS_ALIAS = /\sas\s+([A-Za-z_$][\w$]*)$/;
-var RE_LINE_BREAK = /\r?\n/;
-var statementCache = /* @__PURE__ */ new Map();
-function extractExportedNames(statement) {
-  const names = /* @__PURE__ */ new Set();
-  const braceStart = statement.indexOf("{");
-  const braceEnd = statement.lastIndexOf("}");
-  if (braceStart < 0 || braceEnd <= braceStart) return names;
-  for (const part of statement.slice(braceStart + 1, braceEnd).split(",")) {
-    let name = part.replace(/\s+/g, " ").trim();
-    if (!name) continue;
-    name = name.replace(RE_TYPE_PREFIX, "");
-    const alias = name.match(RE_AS_ALIAS);
-    names.add(alias ? alias[1] : name);
-  }
-  return names;
-}
-function collectReExportStatements(absPath) {
-  const cached = statementCache.get(absPath);
-  if (cached !== void 0) return cached;
-  let text;
-  try {
-    text = fs36.readFileSync(absPath, "utf8");
-  } catch {
-    statementCache.set(absPath, null);
-    return null;
-  }
-  const lines = text.split(RE_LINE_BREAK);
-  const out = [];
-  for (let i = 0; i < lines.length; i++) {
-    const head = lines[i];
-    if (!RE_EXPORT_HEAD.test(head) || RE_LOCAL_DEFINITION_HEAD.test(head)) continue;
-    let end = -1;
-    const limit = Math.min(lines.length, i + MAX_RE_EXPORT_BLOCK_LINES);
-    for (let j = i; j < limit; j++) {
-      if (RE_FROM_CLAUSE.test(lines[j])) {
-        end = j;
-        break;
-      }
-      if (j > i && RE_EXPORT_HEAD.test(lines[j])) break;
-    }
-    if (end < 0) continue;
-    out.push({
-      startLine: i + 1,
-      endLine: end + 1,
-      names: extractExportedNames(lines.slice(i, end + 1).join("\n"))
-    });
-    i = end;
-  }
-  statementCache.set(absPath, out);
-  return out;
-}
-function filterReExportEdges(entries, projectRoot) {
-  const kept = [];
-  const dropped = [];
-  for (const entry of entries) {
-    const absPath = path38.isAbsolute(entry.file) ? entry.file : path38.resolve(projectRoot, entry.file);
-    const statements = collectReExportStatements(absPath);
-    if (statements === null) {
-      kept.push(entry);
-      continue;
-    }
-    const isEdge = statements.some(
-      (s) => entry.line >= s.startLine && entry.line <= s.endLine && s.names.has(entry.symbol)
-    );
-    (isEdge ? dropped : kept).push(entry);
-  }
-  return { kept, dropped };
-}
-var INLINE_IMPORT_TYPE_REF = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)\s*\.\s*([A-Za-z_$][\w$]*)/;
-var INLINE_REF_EXCLUDED_DIRS = /* @__PURE__ */ new Set([
-  "node_modules",
-  "dist",
-  "build",
-  "coverage",
-  "out",
-  "release",
-  ".turbo",
-  ".next"
-]);
-var INLINE_REF_SOURCE_EXT = /* @__PURE__ */ new Set([".ts", ".tsx", ".mts", ".cts"]);
-var INLINE_REF_MAX_BYTES = 2 * 1024 * 1024;
-var INLINE_REF_MAX_FILES = 5e4;
-function resolveRelativeModuleFile(fromFile, specifier) {
-  if (!specifier.startsWith(".")) return null;
-  const base = path38.resolve(path38.dirname(fromFile), specifier);
-  const ext = path38.extname(base);
-  const stem = ext ? base.slice(0, -ext.length) : base;
-  const candidates = [
-    base,
-    `${stem}.ts`,
-    `${stem}.tsx`,
-    `${stem}.mts`,
-    `${stem}.cts`,
-    path38.join(base, "index.ts"),
-    path38.join(base, "index.tsx")
-  ];
-  for (const candidate of candidates) {
-    try {
-      if (fs36.statSync(candidate).isFile()) return candidate;
-    } catch {
-    }
-  }
-  return null;
-}
-function collectInlineRefCandidates(dir2, out, limit) {
-  if (out.length >= limit) return false;
-  let entries;
-  try {
-    entries = fs36.readdirSync(dir2, { withFileTypes: true });
-  } catch {
-    return true;
-  }
-  for (const entry of entries) {
-    if (out.length >= limit) return false;
-    if (entry.name.startsWith(".")) continue;
-    const abs = path38.join(dir2, entry.name);
-    if (entry.isDirectory()) {
-      if (INLINE_REF_EXCLUDED_DIRS.has(entry.name)) continue;
-      if (!collectInlineRefCandidates(abs, out, limit)) return false;
-      continue;
-    }
-    if (entry.isFile() && INLINE_REF_SOURCE_EXT.has(path38.extname(entry.name))) out.push(abs);
-  }
-  return true;
-}
-function toAbsolute(file, projectRoot) {
-  return path38.isAbsolute(file) ? file : path38.resolve(projectRoot, file);
-}
-function collectTargetSymbols(entries, projectRoot) {
-  const targets = /* @__PURE__ */ new Map();
-  for (const entry of entries) {
-    const abs = toAbsolute(entry.file, projectRoot);
-    const set = targets.get(abs);
-    if (set) set.add(entry.symbol);
-    else targets.set(abs, /* @__PURE__ */ new Set([entry.symbol]));
-  }
-  return targets;
-}
-function collectInlineRefsFromFile(file, targets, referenced) {
-  let text;
-  try {
-    if (fs36.statSync(file).size > INLINE_REF_MAX_BYTES) return;
-    text = fs36.readFileSync(file, "utf8");
-  } catch {
-    return;
-  }
-  const re = new RegExp(INLINE_IMPORT_TYPE_REF.source, "g");
-  for (const match of text.matchAll(re)) {
-    const specifier = match[1];
-    const symbol = match[2];
-    if (!specifier || !symbol) continue;
-    const target = resolveRelativeModuleFile(file, specifier);
-    if (target === null) continue;
-    const symbols = targets.get(target);
-    if (!symbols || !symbols.has(symbol)) continue;
-    referenced.add(`${target}\0${symbol}`);
-  }
-}
-function filterInlineImportTypeRefs(entries, projectRoot) {
-  if (entries.length === 0) return { kept: [], dropped: [], degraded: false };
-  const targets = collectTargetSymbols(entries, projectRoot);
-  const files = [];
-  if (!collectInlineRefCandidates(projectRoot, files, INLINE_REF_MAX_FILES)) {
-    return { kept: [...entries], dropped: [], degraded: true };
-  }
-  const referenced = /* @__PURE__ */ new Set();
-  for (const file of files) collectInlineRefsFromFile(file, targets, referenced);
-  const kept = [];
-  const dropped = [];
-  for (const entry of entries) {
-    const abs = toAbsolute(entry.file, projectRoot);
-    (referenced.has(`${abs}\0${entry.symbol}`) ? dropped : kept).push(entry);
-  }
-  return { kept, dropped, degraded: false };
 }
 
 // ../inspect/src/adapters/ts-prune-adapter.ts

@@ -173,7 +173,6 @@ export {
   getToolDimensions,
   mapIssuesToDimensions,
   computeOverallScore,
-  scoreToGrade,
 } from './dimension-mapper';
 export type {
   EventEmitter,
@@ -313,3 +312,5 @@ export {
   isScoredDimension,
 } from './score-dimensions';
 export type { HealthScoreDimension, ScoreDimension, DimensionCoverage } from './score-dimensions';
+export { scoreToGrade, GRADE_ORDER } from './score-grade';
+export type { ScoreGrade } from './score-grade';

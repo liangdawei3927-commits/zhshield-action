@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { saveScore, getLatestScore, getScoreHistory } from '@zh/db';
-import { isReferenceDimension } from '@zh/shared';
+import { GRADE_ORDER, isReferenceDimension, scoreToGrade } from '@zh/shared';
 import {
   linearRegressionSlope,
   computeVelocity,
@@ -119,9 +119,11 @@ function computeOverall(dimensionScores: DimensionScore[]): number {
   return weightSum > 0 ? active.reduce((s, d) => s + d.score * d.weight, 0) / weightSum : 0;
 }
 
-/** 等级排序：A 最好、D 最差；用于短板封顶取更差的那个 */
-const GRADE_RANK: Record<HealthScore['grade'], number> = { A: 0, B: 1, C: 2, D: 3 };
-const RANK_GRADE: HealthScore['grade'][] = ['A', 'B', 'C', 'D'];
+/** 等级排序：A 最好、D 最差；用于短板封顶取更差的那个。次序来源见 `@zh/shared` 的 GRADE_ORDER */
+const GRADE_RANK: Record<HealthScore['grade'], number> = Object.fromEntries(
+  GRADE_ORDER.map((grade, i) => [grade, i]),
+) as Record<HealthScore['grade'], number>;
+const RANK_GRADE: readonly HealthScore['grade'][] = GRADE_ORDER;
 
 /** 红线封顶（十域评分章程）：任一 critical 事实存在时总评 ≤ cap，一票压制 */
 function applyRedLineCap(
@@ -142,8 +144,7 @@ function applyRedLineCap(
  * 覆盖不足时的等级由 UI 决定不展示（见 `computeCoverage`），这里仍返回可复算的等级。
  */
 function computeGrade(overall: number, dimensionScores: readonly DimensionScore[]): HealthScore['grade'] {
-  const base: HealthScore['grade'] =
-    overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
+  const base: HealthScore['grade'] = scoreToGrade(overall);
   const scored = dimensionScores.filter(isOverallDimension);
   if (scored.length === 0) return base;
 

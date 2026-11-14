@@ -44,6 +44,31 @@ export function levenshtein(a: string, b: string): number {
   return prev[n] ?? m;
 }
 
+/**
+ * 构造「疑似仿冒包」威胁条目。
+ *
+ * npm 与 PyPI 两个扫描器的仿冒判定分支此前各写一遍同样的 `makeThreatItem(...)` 调用
+ * —— 上一轮已把 `levenshtein` / `typosquatThreshold` / `makeThreatItem` 本体收进来，
+ * 但**调用点**仍是两份逐字相同的字面量。文案（标题/pattern 前缀/证据句式）是面向用户
+ * 的报告内容，两处漂移会让 npm 与 PyPI 的同类发现在报告里长得不一样，故一并收敛。
+ *
+ * 只收敛这一处：黑名单分支的 title 与 pattern 前缀按生态不同（npm-threat-db /
+ * pypi-threat-db），并非逐字相同，强行参数化只会把差异藏进配置表。
+ */
+export function typosquatThreatItem(
+  filePath: string,
+  name: string,
+  popular: string,
+  distance: number,
+): MalwareItem {
+  return makeThreatItem(filePath, name, {
+    severity: 'high',
+    title: '疑似仿冒包（typosquatting）',
+    pattern: `typosquat:${popular}:${distance}`,
+    evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
+  });
+}
+
 /** 构造供应链威胁条目（type='supply-chain' 的 MalwareItem） */
 export function makeThreatItem(
   filePath: string,

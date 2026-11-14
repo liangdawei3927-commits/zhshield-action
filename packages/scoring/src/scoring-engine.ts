@@ -7,6 +7,7 @@ import type {
   ScoringResult,
   DimensionDefinition,
 } from './types';
+import { scoreToGrade } from '@zh/shared';
 import { resolveScoringConfig } from './project-scoring-config';
 
 function computeOverall(dimensionResults: readonly DimensionScoreDetail[]): number {
@@ -101,10 +102,7 @@ export class ScoringEngine {
   }
 
   private toGrade(score: number): ScoreGrade {
-    if (score >= 90) return 'A';
-    if (score >= 75) return 'B';
-    if (score >= 60) return 'C';
-    return 'D';
+    return scoreToGrade(score);
   }
 
   getConfig(): ScoringConfig {

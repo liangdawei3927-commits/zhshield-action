@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { MalwareItem, MalwareType } from './types';
-import { MAX_SCAN_DEPTH, PACKAGE_JSON_FILE, SKIP_DIRS } from './scan-walk';
+import { PACKAGE_JSON_FILE, walkSourceTree } from './scan-walk';
 
 const MARKDOWN_EXT = '.md';
 const ENV_FILE_NAMES = new Set([
@@ -230,28 +230,10 @@ interface ScanCommentHitsParams {
 export class InjectionGuard {
   async scan(projectPath: string): Promise<MalwareItem[]> {
     const items: MalwareItem[] = [];
-    this.walk(projectPath, 0, projectPath, items);
+    walkSourceTree(projectPath, (fullPath, fileName) =>
+      this.scanFile(fullPath, fileName, projectPath, items),
+    );
     return items;
-  }
-
-  private walk(dir: string, depth: number, projectPath: string, items: MalwareItem[]): void {
-    if (depth > MAX_SCAN_DEPTH) return;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        if (SKIP_DIRS.has(entry.name)) continue;
-        this.walk(fullPath, depth + 1, projectPath, items);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      this.scanFile(fullPath, entry.name, projectPath, items);
-    }
   }
 
   private scanFile(

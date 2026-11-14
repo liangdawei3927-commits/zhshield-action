@@ -10,7 +10,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { MalwareItem } from './types';
 import { safeJoin } from '@zh/shared';
-import { typosquatThreshold, levenshtein, makeThreatItem } from './threat-utils';
+import {
+  typosquatThreshold,
+  levenshtein,
+  makeThreatItem,
+  typosquatThreatItem,
+} from './threat-utils';
 
 const EXTRAS_RE = /\[.*?\]/g;
 const NEWLINE_RE = /\r?\n/;
@@ -224,14 +229,7 @@ function scanManifestNames(manifest: { file: string; names: string[] }): Malware
     for (const popular of KNOWN_POPULAR_PACKAGES) {
       const distance = levenshtein(norm, normalizePyName(popular));
       if (distance >= 1 && distance <= threshold) {
-        items.push(
-          makeThreatItem(manifest.file, name, {
-            severity: 'high',
-            title: '疑似仿冒包（typosquatting）',
-            pattern: `typosquat:${popular}:${distance}`,
-            evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
-          }),
-        );
+        items.push(typosquatThreatItem(manifest.file, name, popular, distance));
         break;
       }
     }

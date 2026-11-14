@@ -11,7 +11,12 @@ import * as path from 'path';
 import { load as loadYaml } from 'js-yaml';
 import type { MalwareItem } from './types';
 import { safeJoin } from '@zh/shared';
-import { typosquatThreshold, levenshtein, makeThreatItem } from './threat-utils';
+import {
+  typosquatThreshold,
+  levenshtein,
+  makeThreatItem,
+  typosquatThreatItem,
+} from './threat-utils';
 
 /** 已知恶意 / 仿冒 npm 包（社区确认，仅收录整名即为恶意的包，不含版本投毒事件） */
 const KNOWN_MALICIOUS_PACKAGES = new Set<string>([
@@ -220,14 +225,7 @@ function scanPackageNames(names: string[], lockPath: string): MalwareItem[] {
     for (const popular of KNOWN_POPULAR_PACKAGES) {
       const distance = levenshtein(short, popular);
       if (distance >= 1 && distance <= threshold) {
-        items.push(
-          makeThreatItem(lockPath, name, {
-            severity: 'high',
-            title: '疑似仿冒包（typosquatting）',
-            pattern: `typosquat:${popular}:${distance}`,
-            evidence: `包名 ${name} 与流行包 ${popular} 编辑距离为 ${distance}`,
-          }),
-        );
+        items.push(typosquatThreatItem(lockPath, name, popular, distance));
         break;
       }
     }

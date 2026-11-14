@@ -1,4 +1,9 @@
-import type { BaselineEntry, Issue as SharedIssue, SuppressedIssue } from '@zh/shared';
+import type {
+  BaselineEntry,
+  Issue as SharedIssue,
+  ScoreGrade,
+  SuppressedIssue,
+} from '@zh/shared';
 
 /** 问题分类维度（跨域单一来源：与 @zh/shared 的 IssueCategory 同源） */
 export type { IssueCategory } from '@zh/shared';
@@ -47,29 +52,21 @@ export interface AdapterResult {
   issues: Issue[];
 }
 
-/** 评分等级；降级时 grade 追加 ` [N工具降级]` 后缀（如 `D [3工具降级]`） */
-export type ScoreGrade = 'A' | 'B' | 'C' | 'D';
+/** 评分等级：定义在 `@zh/shared`（与 scoring 共用同一份，勿在此重定义） */
+export type { ScoreGrade };
 /** 评分等级展示形态：纯等级，或降级时追加 ` [N工具降级]` 后缀 */
 export type ScoreGradeLabel = ScoreGrade | `${ScoreGrade} [${number}工具降级]`;
 
 /** 巡检报告：项目、扫描方式、评分与等级、问题汇总、各适配器结果与建议 */
-export interface InspectionReport {
-  projectId: string;
-  timestamp: Date;
-  scanType: 'full' | 'incremental' | 'scheduled';
-  duration: number;
-  score: { overall: number; grade: ScoreGradeLabel };
-  issues: Issue[];
-  summary: { total: number; error: number; warning: number; info: number };
-  adapterResults: AdapterResult[];
-  /** 非预期降级数（工具不可用/引擎缺失导致"未检测"）：与 ok 判定联动——未检测 ≠ 通过 */
-  degraded?: number;
-  /**
-   * 巡检覆盖率（0~1）：真正执行的检查数 / 应执行检查数（out-of-scope 不计入分母）。
-   * 未执行的检查恒产出零 issues，故覆盖率越低 overall 越不可信——score 已据此封顶。
-   */
-  coverage?: number;
-  recommendations: string[];
+/**
+ * 基线豁免透传字段组。
+ *
+ * `ScanReportInput`（构建入参）与 {@link InspectionReport}（报告输出）必须保持
+ * 同名同义 —— builder 干的正是把入参里的这几项原样搬到报告上。此处此前把 4 个
+ * 字段在两个接口里各声明了一遍：任一边加了新字段、另一边忘了加，豁免信息就会在
+ * 传递中静默丢失，且类型检查完全放行（都是可选项）。
+ */
+export interface BaselineExemptionFields {
   /** 基线豁免命中数（无基线/未启用时为 0） */
   suppressedCount?: number;
   /**
@@ -86,6 +83,25 @@ export interface InspectionReport {
   dormantEntries?: BaselineEntry[];
   /** 已过期、已不参与匹配的豁免条目。因匹配时就被剔除，从 suppressedCount 永远看不见它们。 */
   expiredEntries?: BaselineEntry[];
+}
+
+export interface InspectionReport extends BaselineExemptionFields {
+  projectId: string;
+  timestamp: Date;
+  scanType: 'full' | 'incremental' | 'scheduled';
+  duration: number;
+  score: { overall: number; grade: ScoreGradeLabel };
+  issues: Issue[];
+  summary: { total: number; error: number; warning: number; info: number };
+  adapterResults: AdapterResult[];
+  /** 非预期降级数（工具不可用/引擎缺失导致"未检测"）：与 ok 判定联动——未检测 ≠ 通过 */
+  degraded?: number;
+  /**
+   * 巡检覆盖率（0~1）：真正执行的检查数 / 应执行检查数（out-of-scope 不计入分母）。
+   * 未执行的检查恒产出零 issues，故覆盖率越低 overall 越不可信——score 已据此封顶。
+   */
+  coverage?: number;
+  recommendations: string[];
 }
 
 /** 单次巡检运行上下文：项目、扫描方式与项目画像（用于工具 scope 裁剪） */

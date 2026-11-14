@@ -91,9 +91,5 @@ export function computeOverallScore(dimensions: DimensionScore[]): number {
   return totalWeight > 0 ? Math.round((weighted / totalWeight) * 100) / 100 : 100;
 }
 
-export function scoreToGrade(score: number): 'A' | 'B' | 'C' | 'D' {
-  if (score >= 90) return 'A';
-  if (score >= 75) return 'B';
-  if (score >= 60) return 'C';
-  return 'D';
-}
+/** 分数 → 等级：实现已移到 `score-grade.ts`（全仓唯一阈值表），此处转出保持既有导入路径。 */
+export { scoreToGrade } from './score-grade';

@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeJoin } from '@zh/shared';
+import { asStringArray } from './ts-prune-adapter-core';
 
 export const MONOREPO_OVERLAY_FILE = '.zhshield/tsconfig.ts-prune.monorepo.json';
 
@@ -329,9 +330,6 @@ function assembleOverlay(
   };
 }
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
-}
 
 /** 写入 monorepo overlay 临时文件（非 monorepo 时跳过） */
 export async function writeOverlayFile(

@@ -1,5 +1,12 @@
-import type { BaselineEntry, SuppressedIssue } from '@zh/shared';
-import type { AdapterResult, InspectionReport, Issue, ScoreGrade, ScoreGradeLabel } from './types';
+import { scoreToGrade } from '@zh/shared';
+import type {
+  AdapterResult,
+  BaselineExemptionFields,
+  InspectionReport,
+  Issue,
+  ScoreGrade,
+  ScoreGradeLabel,
+} from './types';
 import type { EventEmitter } from '@zh/shared';
 import { DegradationManager } from '@zh/shared';
 
@@ -28,9 +35,9 @@ function isNotExecuted(result: AdapterResult): boolean {
   return result.degraded === true || result.status === 'error' || result.status === 'unavailable';
 }
 
-/** 等级阈值的唯一来源：scoreOf 与封顶后的等级重算共用，避免两处阈值各自漂移 */
+/** 等级阈值取自 `@zh/shared` 的 scoreToGrade：与 @zh/scoring 共用同一套边界，勿在此重定义 */
 function gradeOf(overall: number): ScoreGrade {
-  return overall >= 90 ? 'A' : overall >= 75 ? 'B' : overall >= 60 ? 'C' : 'D';
+  return scoreToGrade(overall);
 }
 
 /**
@@ -58,8 +65,13 @@ function coverageCap(coverage: number): number {
   return 59;
 }
 
-/** 巡检报告构建入参：项目、扫描方式、耗时、问题列表与各适配器结果 */
-export interface ScanReportInput {
+/**
+ * 巡检报告构建入参：项目、扫描方式、耗时、问题列表与各适配器结果。
+ *
+ * 豁免相关字段直接继承 {@link BaselineExemptionFields}：它们要原样搬到
+ * `InspectionReport` 上，两边各写一遍会让新增字段在一侧悄悄漏掉。
+ */
+export interface ScanReportInput extends BaselineExemptionFields {
   projectId: string;
   scanType: InspectionReport['scanType'];
   duration: number;
@@ -67,14 +79,6 @@ export interface ScanReportInput {
   adapterResults: AdapterResult[];
   /** SOP 分支不惩罚 info 级问题（保持原有计分行为） */
   penalizeInfo?: boolean;
-  /** 基线豁免命中数（透传至报告供消费方观测） */
-  suppressedCount?: number;
-  /** 被基线豁免的问题明细（含命中条目的豁免理由/责任人/到期），透传至报告供输出层显式呈现 */
-  suppressedIssues?: SuppressedIssue<Issue>[];
-  /** 休眠豁免条目（活跃但本轮未命中）：透传供输出层提示清单复核 */
-  dormantEntries?: BaselineEntry[];
-  /** 已过期豁免条目：透传供输出层提示清理 */
-  expiredEntries?: BaselineEntry[];
 }
 
 /**

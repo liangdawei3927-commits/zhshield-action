@@ -1,5 +1,7 @@
-/** 总评等级：由 overall 分数映射的 A/B/C/D 四档 */
-export type ScoreGrade = 'A' | 'B' | 'C' | 'D';
+import type { ScoreGrade } from '@zh/shared';
+
+/** 总评等级：定义在 `@zh/shared`（与 inspect 共用同一份，勿在此重定义） */
+export type { ScoreGrade };
 /** 趋势方向：improving 分数上升 / stable 持平 / declining 分数下降 */
 export type ScoreTrend = 'improving' | 'stable' | 'declining';
 

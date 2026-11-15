@@ -7,7 +7,7 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { safeJoin } from '@zh/shared';
+import { safeJoin, NODE_BUILTIN_MODULES } from '@zh/shared';
 
 const NEWLINE_RE = /\r?\n/;
 
@@ -189,49 +189,6 @@ function extractSpecifiers(line: string): string[] {
   return specs;
 }
 
-/** Node 内置模块：无需声明也不会幻觉 */
-const NODE_BUILTINS: ReadonlySet<string> = new Set([
-  'assert',
-  'buffer',
-  'child_process',
-  'cluster',
-  'console',
-  'constants',
-  'crypto',
-  'dgram',
-  'diagnostics_channel',
-  'dns',
-  'domain',
-  'events',
-  'fs',
-  'http',
-  'http2',
-  'https',
-  'module',
-  'net',
-  'os',
-  'path',
-  'perf_hooks',
-  'process',
-  'punycode',
-  'querystring',
-  'readline',
-  'repl',
-  'stream',
-  'string_decoder',
-  'timers',
-  'tls',
-  'trace_events',
-  'tty',
-  'url',
-  'util',
-  'v8',
-  'vm',
-  'wasi',
-  'worker_threads',
-  'zlib',
-]);
-
 /** 模块说明符 → 包名；相对/绝对/node:/Node 内置返回 null（不是外部包） */
 export function packageNameFromSpecifier(specifier: string): string | null {
   if (specifier.startsWith('.') || specifier.startsWith('/')) return null;
@@ -240,10 +197,10 @@ export function packageNameFromSpecifier(specifier: string): string | null {
     const parts = specifier.split('/');
     if (parts[0] === '' || parts[1] === undefined || parts[1] === '') return null;
     const name = `${parts[0]}/${parts[1]}`; // '@scope/pkg/sub' → '@scope/pkg'
-    return NODE_BUILTINS.has(name) ? null : name;
+    return NODE_BUILTIN_MODULES.has(name) ? null : name;
   }
   const first = specifier.split('/')[0];
-  if (first === undefined || first === '' || NODE_BUILTINS.has(first)) return null;
+  if (first === undefined || first === '' || NODE_BUILTIN_MODULES.has(first)) return null;
   return first; // 'lodash/fp' → 'lodash'
 }
 

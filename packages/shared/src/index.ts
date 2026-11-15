@@ -266,6 +266,7 @@ export {
 export type { RefactorBaselineCounts, RefactorBaselineRecord } from './refactor-baseline-io';
 export { safeReadDirEntries, expandHome } from './fs-safe';
 export { NOISE_DIRS } from './noise-dirs';
+export { NODE_BUILTIN_MODULES } from './node-builtins';
 export { constantTimeEqual } from './constant-time';
 export type { EslintMessage } from './lint-message';
 export { escapeRegExp } from './text-utils';

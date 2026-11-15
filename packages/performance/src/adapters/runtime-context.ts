@@ -15,56 +15,11 @@
  *
  * 判定信号刻意保持简单可解释，不做推断引擎；宁可漏报也不在高置信度上造假精度。
  */
+import { NODE_BUILTIN_MODULES } from '@zh/shared';
 import type { FileScan, ScopeFacts, ScopeKind, SyncCallSite } from './ast-scan';
 
 /** 单文件所处的运行时上下文 */
 export type RuntimeContext = 'browser' | 'electron-renderer' | 'electron-main' | 'node';
-
-/** Node 内建模块名（bare specifier；`node:` 前缀与子路径如 `fs/promises` 另判） */
-const NODE_BUILTINS: ReadonlySet<string> = new Set([
-  'assert',
-  'async_hooks',
-  'buffer',
-  'child_process',
-  'cluster',
-  'console',
-  'constants',
-  'crypto',
-  'dgram',
-  'diagnostics_channel',
-  'dns',
-  'domain',
-  'events',
-  'fs',
-  'http',
-  'http2',
-  'https',
-  'inspector',
-  'module',
-  'net',
-  'os',
-  'path',
-  'perf_hooks',
-  'process',
-  'punycode',
-  'querystring',
-  'readline',
-  'repl',
-  'stream',
-  'string_decoder',
-  'sys',
-  'timers',
-  'tls',
-  'trace_events',
-  'tty',
-  'url',
-  'util',
-  'v8',
-  'vm',
-  'wasi',
-  'worker_threads',
-  'zlib',
-]);
 
 /** 浏览器 / DOM 全局（大小写敏感精确匹配，故 `DocumentBuilder` 之类不算） */
 const DOM_GLOBALS: ReadonlySet<string> = new Set([
@@ -152,7 +107,7 @@ function usesNodeBuiltin(scan: FileScan): boolean {
   for (const specifier of scan.moduleSpecifiers) {
     if (specifier.startsWith('node:')) return true;
     const [root] = specifier.split('/');
-    if (root !== undefined && NODE_BUILTINS.has(root)) return true;
+    if (root !== undefined && NODE_BUILTIN_MODULES.has(root)) return true;
   }
   return false;
 }

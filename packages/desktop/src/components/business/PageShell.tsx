@@ -34,8 +34,6 @@ interface PageShellProps {
   featureList?: FeatureItem[];
   /** 底部自定义插槽（替代 featureList 网格） */
   footer?: ReactNode;
-  /** 底部卡片网格列数（默认 4） */
-  columns?: 2 | 3 | 4 | 6;
   /** 是否加载中 */
   loading?: boolean;
   /**
@@ -66,23 +64,18 @@ interface PageShellProps {
   secondaryDisabled?: boolean;
 }
 
-/** 底部功能清单 — 全站统一贴底卡片网格（EntryCard md，列数可配置） */
-function FeatureList({
-  features,
-  columns,
-}: {
-  features: FeatureItem[];
-  columns: NonNullable<PageShellProps['columns']>;
-}) {
-  const columnsClass: Record<NonNullable<PageShellProps['columns']>, string> = {
-    2: 'grid-cols-2',
-    3: 'grid-cols-3',
-    4: 'grid-cols-4',
-    6: 'grid-cols-6',
-  };
+/**
+ * 底部功能清单 — 全站统一贴底卡片网格（EntryCard md，固定 4 列）。
+ *
+ * 列数**不再可配**（2026-11-14）：原先按页传 `columns`，而各页的能力条数
+ * 又各自为政（3 / 4 / 5 条都有），于是垃圾清理与代码重构三张卡铺满半屏、
+ * 性能优化五张卡第二行孤零零挂一张 —— 同一套导航里十页十种版式。
+ * 现固定 4 列，条数由各页保证为 4（能力注册表驱动的四页由测试锁定）。
+ */
+function FeatureList({ features }: { features: FeatureItem[] }) {
   return (
     <div className="w-full flex flex-col items-center mt-auto mb-10">
-      <div className={`grid ${columnsClass[columns]} gap-4 w-full px-6`}>
+      <div className="grid grid-cols-4 gap-4 w-full px-6">
         {features.map((feature, i) => (
           <EntryCard
             key={i}
@@ -139,7 +132,7 @@ function DetailCornerLink() {
  * 只多一条「loading 必填」，且不带底部功能网格那几项。
  * 用 Omit 派生而非照抄一份字段清单，避免两处声明随迭代漂移。
  */
-type PageHeroProps = Omit<PageShellProps, 'loading' | 'featureList' | 'footer' | 'columns'> & {
+type PageHeroProps = Omit<PageShellProps, 'loading' | 'featureList' | 'footer'> & {
   loading: boolean;
 };
 
@@ -238,7 +231,6 @@ export function PageShell({
   actionDomain,
   featureList,
   footer,
-  columns = 4,
   loading = false,
   queued = false,
   queuePosition,
@@ -274,9 +266,7 @@ export function PageShell({
         secondaryDisabled={secondaryDisabled}
       />
       {footer}
-      {featureList && featureList.length > 0 && (
-        <FeatureList features={featureList} columns={columns} />
-      )}
+      {featureList && featureList.length > 0 && <FeatureList features={featureList} />}
     </div>
   );
 }

@@ -17,10 +17,8 @@ interface EmptyStateProps extends ScanEmptyStateParams {
   error: string;
 }
 
-/** 构建重构空态的特色说明列表 */
-function buildRefactorFeatures(
-  t: ReturnType<typeof useT>,
-): ComponentProps<typeof DomainEmptyView>['features'] {
+/** 构建重构空态的特色说明列表（文案全取注册表，无需 t） */
+function buildRefactorFeatures(): ComponentProps<typeof DomainEmptyView>['features'] {
   // 注册表决定**渲染哪几项**（只渲染 status='implemented' 的）。
   // 「一键应用推荐重构方案」（refactor.auto-fix）现已落地（2026-11-03）：
   // 桌面端入口 + 写盘前自动备份。注册表里 status 仍是 planned/deprecated 的
@@ -28,9 +26,18 @@ function buildRefactorFeatures(
   // 「每日自动检查」「按类别分组」是运行形态而非检测能力，由页面自身承载，不入注册表。
   return buildCapabilityFeatures('refactor', {
     icons: {
-      'refactor.smells': (
+      // 异味拆成函数级 / 结构级两张卡（各由不同探测器产出），图标也随之分家
+      'refactor.smells.function': (
         <FeatureIcon>
           <LayersGlyph />
+        </FeatureIcon>
+      ),
+      'refactor.smells.structure': (
+        <FeatureIcon>
+          <path d="M4 4h7v7H4z" />
+          <path d="M13 4h7v7h-7z" />
+          <path d="M4 13h7v7H4z" />
+          <path d="M13 13h7v7h-7z" />
         </FeatureIcon>
       ),
       'refactor.duplicate-code': (
@@ -43,10 +50,6 @@ function buildRefactorFeatures(
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
         </FeatureIcon>
       ),
-    },
-    descriptions: {
-      'refactor.smells': t('page.refactor.shell.featureSmell.desc'),
-      'refactor.duplicate-code': t('page.refactor.shell.featureGrouping.desc'),
     },
   });
 }
@@ -61,7 +64,7 @@ export function RefactorEmptyState(props: EmptyStateProps) {
         domain="refactor"
         title={t('page.refactor.shell.title')}
         subtitle={t('page.refactor.shell.subtitle')}
-        features={buildRefactorFeatures(t)}
+        features={buildRefactorFeatures()}
         buttonText={t('page.refactor.scanNow')}
         onAction={props.onScan}
         actionDomain="refactor"

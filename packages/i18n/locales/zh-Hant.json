@@ -925,8 +925,8 @@
             "title": "自動同步"
           }
         },
-        "subtitle": "為專案設定與關鍵檔案保留可回滾快照，支援本地與 GitHub 雙通道",
-        "title": "保護重要配置，資料永不丟失"
+        "subtitle": "設定與關鍵檔案留快照，本機與 GitHub 雙通道",
+        "title": "設定隨時可回滾"
       },
       "noRecords": "暫無備份記錄",
       "oneClickBackup": "一鍵備份",
@@ -1002,8 +1002,8 @@
       "ecosystem": "生態",
       "empty": {
         "start": "開始盤點",
-        "subtitle": "解析鎖檔案與依賴清單，繪製依賴圖譜並校驗完整性",
-        "title": "盤點依賴，看清圖譜"
+        "subtitle": "核驗依賴完整性、授權條款與已知漏洞",
+        "title": "盤點依賴風險"
       },
       "env": "環境一致性",
       "env.actual": "實際：{{value}}",
@@ -1160,8 +1160,8 @@
       "dependencyHint": "未用依賴不自動刪除，確認無引用後可從 package.json 手動移除",
       "done": "垃圾清理完成",
       "empty": {
-        "subtitle": "掃描未使用檔案、冗餘依賴與死程式碼",
-        "title": "清理無用檔案，為專案減負"
+        "subtitle": "找出無用檔案、建置產物與未用依賴",
+        "title": "清理專案垃圾"
       },
       "emptyList": "專案很乾淨，沒有可清理的垃圾",
       "feature": {
@@ -1221,6 +1221,9 @@
       "copiedAll": "已複製全部 {{count}} 條問題，可貼上到 AI 修復",
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "duration": "掃描耗時 {{duration}}ms",
+      "empty": {
+        "title": "守住每次提交"
+      },
       "falsePositiveCount": "誤報反饋 {{count}} 條",
       "falsePositiveSubmitted": "已提交誤報反饋，將用於校準規則",
       "feature": {
@@ -1245,7 +1248,7 @@
         "subtitle": "hook 自動觸發 + 手動掃描落庫",
         "title": "最近攔截記錄"
       },
-      "idleSubtitle": "即時守護程式碼變更，在提交/推送/CI 關卡自動攔截",
+      "idleSubtitle": "提交、推送與 CI 三道關卡自動攔截",
       "lastBlockAt": "最近 {{time}}",
       "lastScan": "上次掃描 · {{time}}",
       "level": {
@@ -1313,8 +1316,8 @@
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "done": "巡檢完成",
       "empty": {
-        "subtitle": "每天自動巡檢架構規範與型別安全，也可點選一鍵體檢",
-        "title": "體檢專案架構與型別安全"
+        "subtitle": "巡檢分層依賴、型別安全與程式碼規範",
+        "title": "架構與型別體檢"
       },
       "feature": {
         "architecture": {
@@ -1405,8 +1408,8 @@
           "title": "定時器最佳化"
         },
         "start": "開始檢測",
-        "subtitle": "掃描低效陣列遍歷、正則重複編譯、冗餘分配等效能問題",
-        "title": "檢測執行時效能反模式，最佳化執行效率"
+        "subtitle": "檢測低效迴圈、阻塞 IO、體積超標與正則回溯",
+        "title": "找出效能瓶頸"
       },
       "source": "效能",
       "suggestion": "建議：{{suggestion}}",
@@ -1416,6 +1419,7 @@
     },
     "refactor": {
       "addProjectFirst": "請先在儀表盤新增專案",
+      "fileCount": "{{count}} 個檔案",
       "groupedIssues": "重構問題（按型別分組）",
       "groupsSummary": "{{groups}} 類 · {{total}} 處",
       "header": {
@@ -1449,8 +1453,8 @@
           "desc": "檢測重複程式碼、過長函式、高圈複雜度等問題",
           "title": "程式碼異味"
         },
-        "subtitle": "每天自動檢查一次程式碼重複、程式碼異味、過長函式等，一鍵應用推薦重構方案",
-        "title": "最佳化程式碼結構，消除技術債務"
+        "subtitle": "查重複程式碼與壞味道，一鍵套用推薦方案",
+        "title": "消除程式碼異味"
       },
       "smell": {
         "callbackHell": "回撥地獄",
@@ -1530,6 +1534,10 @@
       },
       "empty": {
         "feature": {
+          "gate": {
+            "title": "門禁結論",
+            "desc": "彙總提交 / 推送 / CI 門禁結論，看清是否可放行"
+          },
           "module": {
             "title": "模組級評分",
             "desc": "依專案輪廓拆分到各模組，分別給出健康得分"
@@ -1543,8 +1551,8 @@
             "title": "趨勢對比"
           }
         },
-        "subtitle": "尚無評分報告 —— 執行一次專案體檢，這裡會沉澱每次的健康分與趨勢",
-        "title": "多維度分析報告，決策更有依據"
+        "subtitle": "尚無報告，跑一次體檢後在這裡看趨勢",
+        "title": "看清品質趨勢"
       },
       "generate": "彙總生成報告",
       "generating": "產生中...",
@@ -1610,8 +1618,8 @@
       "copyAllPrompt": "{{count}} 項需處理，可一鍵複製全部到 AI 修復",
       "done": "安全檢查完成",
       "empty": {
-        "subtitle": "多引擎深度掃描漏洞與惡意程式碼，結果與工具可用性一併呈現",
-        "title": "深度掃描漏洞，修復安全隱患"
+        "subtitle": "多引擎掃描漏洞、惡意程式碼與硬編碼密鑰",
+        "title": "掃清安全隱患"
       },
       "feature": {
         "dependency": {
@@ -1718,10 +1726,10 @@
           "desc": "檔案變更 / 日誌 / 執行行程，依專案自動偵測",
           "title": "三源監控"
         },
-        "subtitleIdle": "當前監控 0 個檔案，點選下方按鈕啟動",
-        "subtitleMonitoring": "監控中（自動，7×24）——正在守護當前專案",
-        "titleIdle": "24小時無間斷監控，異常無所遁形",
-        "titleMonitoring": "監控已啟動，異常無所遁形"
+        "subtitleIdle": "點擊下方按鈕，開始守護目前專案",
+        "subtitleMonitoring": "7×24 守護檔案、日誌與程序異常",
+        "titleIdle": "監控未啟動",
+        "titleMonitoring": "監控執行中"
       },
       "source": {
         "backend": "後端",
@@ -1775,8 +1783,8 @@
       },
       "empty": {
         "start": "開始盤點",
-        "subtitle": "分析掃描問題與模組熱度，估算利息與本金，按 ROI 排序給出償還建議",
-        "title": "量化技術債，把評分變成行動"
+        "subtitle": "估算利息與本金，依 ROI 排出償還順序",
+        "title": "量化技術債"
       },
       "errorTitle": "盤點失敗",
       "factor": {

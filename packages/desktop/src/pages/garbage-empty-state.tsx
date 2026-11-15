@@ -26,6 +26,13 @@ export function GarbageEmptyState(props: ScanEmptyStateParams) {
               <path d="M9 15l6 6M15 15l-6 6" />
             </FeatureIcon>
           ),
+          'garbage.build-artifact': (
+            <FeatureIcon>
+              <path d="M3 7l9-4 9 4-9 4-9-4z" />
+              <path d="M3 12l9 4 9-4" />
+              <path d="M3 17l9 4 9-4" />
+            </FeatureIcon>
+          ),
           'garbage.unused-dependency': (
             <FeatureIcon>
               <rect x="3" y="3" width="18" height="18" rx="2" />

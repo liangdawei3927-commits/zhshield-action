@@ -160,13 +160,13 @@ test.describe('智汇码盾桌面端 E2E', () => {
     ({ app, page } = await launchApp({ seedProject: true }));
     // 各页空态标题与 page.<x>.empty.title i18n 键对齐（种子项目无扫描数据 → 空态）
     await navBar(page).getByRole('button', { name: '项目体检' }).click();
-    await expect(page.getByText('体检项目架构与类型安全')).toBeVisible();
+    await expect(page.getByText('架构与类型体检')).toBeVisible();
 
     await navBar(page).getByRole('button', { name: '安全中心' }).click();
-    await expect(page.getByText('深度扫描漏洞，修复安全隐患')).toBeVisible();
+    await expect(page.getByText('扫清安全隐患')).toBeVisible();
 
     await navBar(page).getByRole('button', { name: '技术债务' }).click();
-    await expect(page.getByText('量化技术债，把评分变成行动')).toBeVisible();
+    await expect(page.getByText('量化技术债', { exact: true })).toBeVisible();
 
     // 报告中心不在 TopNav（10 项上限），入口在侧边栏「项目管理」项目行，不在 Banner
     await page.getByTitle('展开侧边栏').click();
@@ -174,7 +174,7 @@ test.describe('智汇码盾桌面端 E2E', () => {
       .getByRole('complementary')
       .getByRole('button', { name: '报告中心' })
       .click();
-    await expect(page.getByText('多维度分析报告，决策更有依据')).toBeVisible();
+    await expect(page.getByText('看清质量趋势')).toBeVisible();
   });
 
   test('侧边栏展开与收回', async () => {

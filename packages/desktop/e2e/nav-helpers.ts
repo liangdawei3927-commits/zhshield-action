@@ -81,16 +81,16 @@ export interface NavEntry {
  */
 export const ENTRIES: NavEntry[] = [
   { id: 'inspect', label: '项目体检', where: 'nav', markers: ['架构规范', '类型安全', '一键体检'], action: '一键体检' },
-  { id: 'guard', label: '门禁系统', where: 'nav', markers: ['实时守护代码变更', '门禁', '检查项'], action: '立即扫描' },
-  { id: 'sentinel', label: '哨兵监控', where: 'nav', markers: ['无间断监控', '监控已启动', '事件时间线'], action: '启动监控' },
-  { id: 'security', label: '安全中心', where: 'nav', markers: ['深度扫描漏洞', '安全评分', '漏洞扫描'], action: '一键扫描' },
-  { id: 'deps', label: '依赖管家', where: 'nav', markers: ['管家盘点', '开始盘点', '依赖图谱'], action: '开始盘点' },
-  { id: 'garbage', label: '垃圾清理', where: 'nav', markers: ['清理无用文件', '开始扫描', '可清理'], action: '开始扫描' },
-  { id: 'performance', label: '性能优化', where: 'nav', markers: ['检测运行时性能反模式', '开始检测', '性能'], action: '开始检测' },
+  { id: 'guard', label: '门禁系统', where: 'nav', markers: ['守住每次提交', '门禁', '检查项'], action: '立即扫描' },
+  { id: 'sentinel', label: '哨兵监控', where: 'nav', markers: ['监控未启动', '监控运行中', '事件时间线'], action: '启动监控' },
+  { id: 'security', label: '安全中心', where: 'nav', markers: ['扫清安全隐患', '安全评分', '漏洞扫描'], action: '一键扫描' },
+  { id: 'deps', label: '依赖管家', where: 'nav', markers: ['盘点依赖风险', '开始盘点', '依赖图谱'], action: '开始盘点' },
+  { id: 'garbage', label: '垃圾清理', where: 'nav', markers: ['清理项目垃圾', '开始扫描', '可清理'], action: '开始扫描' },
+  { id: 'performance', label: '性能优化', where: 'nav', markers: ['找出性能瓶颈', '开始检测', '性能'], action: '开始检测' },
   { id: 'techdebt', label: '技术债务', where: 'nav', markers: ['量化技术债', '开始盘点', '债务'], action: '开始盘点' },
-  { id: 'refactor', label: '代码重构', where: 'nav', markers: ['优化代码结构', '马上检查', '重构'], action: '马上检查' },
-  { id: 'backup', label: '备份中心', where: 'nav', markers: ['保护重要配置', '一键备份', '备份记录'], action: '一键备份' },
-  { id: 'reports', label: '报告中心', where: 'sidebar', markers: ['分析报告', '汇总生成报告', '多维度分析报告'], action: '汇总生成报告' },
+  { id: 'refactor', label: '代码重构', where: 'nav', markers: ['消除代码异味', '马上检查', '重构'], action: '马上检查' },
+  { id: 'backup', label: '备份中心', where: 'nav', markers: ['配置随时可回滚', '一键备份', '备份记录'], action: '一键备份' },
+  { id: 'reports', label: '报告中心', where: 'sidebar', markers: ['分析报告', '汇总生成报告', '看清质量趋势'], action: '汇总生成报告' },
 ];
 
 const { ELECTRON_RUN_AS_NODE: _d1, NODE_OPTIONS: _d2, ...CLEAN_ENV } = process.env;

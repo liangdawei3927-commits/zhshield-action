@@ -83,10 +83,13 @@ function hasEvidence(identifier: string): boolean {
 }
 
 describe('能力注册表 — 结构约束', () => {
-  it('每条声明都有稳定 id、域、标签与状态', () => {
+  it('每条声明都有稳定 id、域、标签、说明与状态', () => {
     for (const cap of CAPABILITY_REGISTRY) {
       expect(cap.id, '能力 id 不得为空').toBeTruthy();
       expect(cap.label, `能力 ${cap.id} 缺标签`).toBeTruthy();
+      // 说明与标签同源：空态卡片第二行直接渲染 summary。
+      // 缺了它，卡片就只能把标题复读一遍（2026-11-14 垃圾/性能/重构三页实测）。
+      expect(cap.summary, `能力 ${cap.id} 缺说明（summary）`).toBeTruthy();
       expect(['implemented', 'planned', 'deprecated']).toContain(cap.status);
     }
   });
@@ -188,18 +191,19 @@ describe('能力注册表 — 按域查询', () => {
     }
   });
 
-  it('性能域的现代化 API / 定时器仍标记为未实现（UI 不得宣称），ReDoS 已落地', () => {
+  it('性能域的现代化 API / 定时器仍标记为未实现（UI 不得宣称），运行时反模式已落地', () => {
     const unimplemented = unimplementedCapabilities('performance').map((c) => c.id);
-    // ReDoS 已由原生 RedosDetectorImpl 落地并转 implemented（2026-11-03）
-    expect(unimplemented).not.toContain('performance.redos');
+    expect(unimplemented).not.toContain('performance.runtime');
     expect(unimplemented).toContain('performance.modern-api');
     expect(unimplemented).toContain('performance.timer');
-    // 且必须给出实现证据
-    const redos = (CAPABILITIES_BY_DOMAIN.get('performance') ?? []).find(
-      (c) => c.id === 'performance.redos',
+    // 运行时反模式一张卡覆盖嵌套循环 / 同步阻塞 IO / ReDoS 三类实现证据。
+    // ReDoS 由原生 RedosDetectorImpl 落地（2026-11-03），不得因为合并展示而漏掉。
+    const runtime = (CAPABILITIES_BY_DOMAIN.get('performance') ?? []).find(
+      (c) => c.id === 'performance.runtime',
     );
-    expect(redos?.status).toBe('implemented');
-    expect(redos?.implementedBy.length).toBeGreaterThan(0);
+    expect(runtime?.status).toBe('implemented');
+    expect(runtime?.implementedBy).toContain('performance.redos');
+    expect(runtime?.implementedBy).toContain('performance.runtime.nested-loop');
   });
 
   it('安全域的「规范检查」与「依赖检查」均被标记为已移交', () => {

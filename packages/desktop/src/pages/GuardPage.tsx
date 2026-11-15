@@ -4,7 +4,7 @@ import type { AsyncScanActionProps } from './async-scan-props';
 import { DetailEntryProvider } from '../contexts/DetailEntryContext';
 import { DomainEmptyView } from '../components/business/DomainEmptyView';
 import { DomainReportShell } from '../components/business/domain-report-shell';
-import { scanRunProps } from '../components/business/ScanEmptyState';
+import { scanRunProps, type ScanEmptyStateParams } from '../components/business/ScanEmptyState';
 import { type ReportStatCard } from '../components/business/ReportShell';
 import { FeatureIcon } from '../components/ui/Icons';
 import { useGuardPage, buildGuardLevels, type GuardLevelInfo } from './guard-logic';
@@ -189,24 +189,20 @@ function GuardReportView({
   );
 }
 
-function GuardEmptyView(props: {
-  projectPath: string;
-  loading: boolean;
-  progress?: number;
-  statusMessage?: string;
-  queued?: boolean;
-  queuePosition?: number;
-  /** 停止本次门禁扫描 */
-  onCancel: () => void;
-  stopping: boolean;
-  onScan: () => void;
-  t: (key: string, params?: Record<string, unknown>) => string;
-}) {
+/**
+ * 空态 props：运行态字段复用全仓统一的空态契约 {@link ScanEmptyStateParams}，
+ * 本域只补 `t`。此前逐行重抄 9 个字段，与 inspect / refactor 的空态声明重复。
+ */
+function GuardEmptyView(
+  props: ScanEmptyStateParams & {
+    t: (key: string, params?: Record<string, unknown>) => string;
+  },
+) {
   return (
     <DomainEmptyView
       projectPath={props.projectPath}
       domain="guard"
-      title={props.t('nav.guard')}
+      title={props.t('page.guard.empty.title')}
       subtitle={props.t('page.guard.idleSubtitle')}
       features={[
         {

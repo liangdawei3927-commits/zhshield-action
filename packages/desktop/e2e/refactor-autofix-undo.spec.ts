@@ -161,7 +161,7 @@ test.describe('自动修复应用 / 撤销闭环 E2E', () => {
 
     // 进入重构页
     await navBar(page).getByRole('button', { name: '代码重构' }).click();
-    await expect(page.getByText('优化代码结构，消除技术债务')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('消除代码异味')).toBeVisible({ timeout: 15_000 });
 
     // ① 扫描：真正落定后再进详情（本页满分留主页、不满分自动展开，两种都兜住）
     await page.getByRole('button', { name: '马上检查' }).click();

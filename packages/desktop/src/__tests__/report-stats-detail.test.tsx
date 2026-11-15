@@ -82,7 +82,7 @@ const REPORT: RefactorReportData = {
 const t = ((key: string) => key) as never;
 
 function statsOfReport(): ReportStatCard[] {
-  return refactorReportStats(t, REPORT, (() => undefined) as never);
+  return refactorReportStats(t, REPORT, (() => undefined) as never, (() => undefined) as never);
 }
 
 describe('重构页统计卡：必须可点击', () => {
@@ -101,6 +101,21 @@ describe('重构页统计卡：必须可点击', () => {
     expect(files.detail?.items.length).toBe(REPORT.files.length);
     expect(highPriority.value).toBe(REPORT.summary.needsImmediateAction);
     expect(highPriority.detail?.items.length).toBe(highPriority.value);
+  });
+
+  it('「需重构文件 / 高优先级」明细是一张卡：标题徽标 + 文件数 + 整表「全部复制到 AI」', () => {
+    const [, files, highPriority] = statsOfReport();
+    for (const stat of [files, highPriority]) {
+      const detail = stat.detail!;
+      const html = renderToStaticMarkup(<I18nProvider>{detail.render(detail.items)}</I18nProvider>);
+      // 头部与「重构问题（按类型分组）」分类卡同形：徽标用统计卡标题、旁边文件数
+      expect(html, `${stat.key} 卡明细缺头部徽标`).toContain(stat.label);
+      // 卡片内文件数就是明细条数（语言固定 zh-Hans，见文件头 navigator 桩）
+      expect(html, `${stat.key} 卡明细文件数不符`).toContain(`${detail.items.length} 个文件`);
+      expect(html.match(/全部复制到 AI/g) ?? [], `${stat.key} 卡明细缺整表复制`).toHaveLength(1);
+      // 「复制到AI」（无空格）是逐行按钮的文案；没了就说明整表复制已取代逐行复制
+      expect(html.match(/复制到AI/g) ?? []).toEqual([]);
+    }
   });
 });
 

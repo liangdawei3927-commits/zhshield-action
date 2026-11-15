@@ -129,7 +129,17 @@ export function useCopyToAi(projectPath: string) {
       copyIssues(group.items.map((smell) => toAiIssue(smell.location.filePath, smell))),
     [copyIssues, toAiIssue],
   );
-  return { copyToAi, copyGroupToAi };
+  // 文件清单整表复制（「需重构文件 / 高优先级」明细的「全部复制到AI」）：
+  // 一个文件条目代表「这个文件要重构」，复制内容是该文件下的全部异味
+  // （引擎只输出有异味的文件，故 smells 必非空）
+  const copyFilesToAi = useCallback(
+    (files: readonly RefactorFile[]) =>
+      copyIssues(
+        files.flatMap((file) => file.smells.map((smell) => toAiIssue(file.filePath, smell))),
+      ),
+    [copyIssues, toAiIssue],
+  );
+  return { copyToAi, copyGroupToAi, copyFilesToAi };
 }
 
 /** 重构扫描执行：loading/进度来自任务中心，状态 + 手动扫描（防重入） */
@@ -320,7 +330,7 @@ export function useRefactorAutoFix(
 }
 
 export function useRefactorPage(projectPath: string) {
-  const { copyToAi, copyGroupToAi } = useCopyToAi(projectPath);
+  const { copyToAi, copyGroupToAi, copyFilesToAi } = useCopyToAi(projectPath);
   const scan = useRefactorScan(projectPath);
   const { applying, applyAutoFix, undo, undoing, undoAutoFix } = useRefactorAutoFix(
     projectPath,
@@ -337,6 +347,7 @@ export function useRefactorPage(projectPath: string) {
     lastAutoAt,
     copyToAi,
     copyGroupToAi,
+    copyFilesToAi,
     applying,
     applyAutoFix,
     undo,

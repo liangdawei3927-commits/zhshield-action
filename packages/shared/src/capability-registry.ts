@@ -64,6 +64,15 @@ export interface CapabilityDeclaration {
   domain: DomainId;
   /** 能力名（人类可读，中文） */
   label: string;
+  /**
+   * 卡片第二行说明（一句话，中文，约 15–25 字）。
+   *
+   * 为什么放在注册表而不是 i18n（2026-11-14 实测）：空态底部卡片按注册表逐条渲染，
+   * 说明若另取 i18n，**缺键的能力只能把 `label` 再念一遍** —— 垃圾清理、
+   * 性能优化、代码重构三页当时就是这样（标题与说明逐字相同），比不翻译更难看。
+   * 一个能力的两行字必须同源：要么都在注册表，要么都在 i18n，不能各写一半。
+   */
+  summary: string;
   /** 状态 */
   status: CapabilityStatus;
   /**
@@ -91,16 +100,10 @@ export interface CapabilityDeclaration {
 export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
   // ─── 性能优化域 ──────────────────────────────────────────────────────────
   {
-    id: 'performance.runtime.nested-loop',
-    domain: 'performance',
-    label: '运行时复杂度（嵌套循环 / 同步阻塞 IO）',
-    status: 'implemented',
-    implementedBy: ['performance.runtime.nested-loop', 'performance.runtime.sync-io'],
-  },
-  {
     id: 'performance.build-config',
     domain: 'performance',
-    label: '构建配置（压缩 / sourcemap / mode）',
+    label: '构建配置',
+    summary: '压缩 / sourcemap / mode 是否开启产物优化',
     status: 'implemented',
     implementedBy: ['build-config'],
   },
@@ -108,6 +111,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'performance.bundle-size',
     domain: 'performance',
     label: '产物体积',
+    summary: '单文件过大、未压缩与产物体积告警',
     status: 'implemented',
     implementedBy: ['bundle-size'],
   },
@@ -115,17 +119,26 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'performance.tree-shaking',
     domain: 'performance',
     label: 'Tree-shaking / 代码分割',
+    summary: 'sideEffects 缺失、全量引入与 chunk 划分检查',
     status: 'implemented',
     implementedBy: ['tree-shaking', 'chunk-splitting'],
   },
   {
-    id: 'performance.redos',
+    // 合并展示（2026-11-14）：嵌套循环 / 同步阻塞 IO / ReDoS 本来就同属「运行时反模式」
+    // （《07》性能域一行即如此归类）。此前拆成两张卡，空态底部变成 5 张卡、第二行孤零零
+    // 挂一张，与其余九页的 4 张卡版式不一致；合并后既不多宣称也不少宣称。
+    id: 'performance.runtime',
     domain: 'performance',
-    label: 'ReDoS 检测（正则灾难性回溯）',
+    label: '运行时反模式',
+    summary: '嵌套循环、同步阻塞 IO 与 ReDoS 灾难性回溯',
     status: 'implemented',
-    implementedBy: ['performance.redos'],
+    implementedBy: [
+      'performance.runtime.nested-loop',
+      'performance.runtime.sync-io',
+      'performance.redos',
+    ],
     note:
-      '由 @zh/performance 的原生 RedosDetectorImpl 实现（TS AST 静态分析嵌套不定量词），' +
+      'ReDoS 由 @zh/performance 的原生 RedosDetectorImpl 实现（TS AST 静态分析嵌套不定量词），' +
       '随 runPerformanceDomain 在桌面端真实执行 —— 不依赖 semgrep 二进制，未装工具也能查。' +
       '内核 redos.yml 是 semgrep 形态的等价资产，保留给 CLI/CI 可选使用，但桌面端以原生探测器为准 ' +
       '（性能域走 domain-executor，不经 SOP 规则引擎，故 semgrep 规则在此不会被执行）。',
@@ -134,6 +147,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'performance.modern-api',
     domain: 'performance',
     label: '现代化 API 推荐（.at / spread）',
+    summary: '推荐 .at / spread 等现代 API 替代旧写法',
     status: 'planned',
     implementedBy: [],
     note: '尚无探测器。',
@@ -142,6 +156,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'performance.timer',
     domain: 'performance',
     label: '定时器优化（setTimeout / setInterval 滥用）',
+    summary: '检测 setTimeout / setInterval 滥用与泄漏',
     status: 'planned',
     implementedBy: [],
     note: '尚无探测器。',
@@ -152,6 +167,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.vuln.sql-injection',
     domain: 'security',
     label: 'SQL 注入检测',
+    summary: 'semgrep 检查拼接 SQL 与未参数化查询',
     status: 'implemented',
     implementedBy: ['security.scan.semgrep.sql-injection'],
   },
@@ -159,6 +175,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.vuln.xss',
     domain: 'security',
     label: 'XSS 检测',
+    summary: 'semgrep 检查未转义输出与危险 DOM 写入',
     status: 'implemented',
     implementedBy: ['security.scan.semgrep.xss'],
   },
@@ -166,6 +183,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.vuln.command-injection',
     domain: 'security',
     label: '命令注入检测',
+    summary: 'semgrep 检查未校验的命令拼接与执行',
     status: 'implemented',
     implementedBy: ['security.scan.semgrep.command-injection'],
   },
@@ -173,6 +191,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.vuln.csrf',
     domain: 'security',
     label: 'CSRF 检测',
+    summary: 'semgrep 检查缺少 CSRF 防护的写操作',
     status: 'implemented',
     implementedBy: ['security.scan.semgrep.csrf'],
   },
@@ -180,6 +199,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.vuln.path-traversal',
     domain: 'security',
     label: '路径穿越检测',
+    summary: 'semgrep 检查未校验的文件路径拼接',
     status: 'implemented',
     implementedBy: ['security.scan.semgrep.path-traversal'],
   },
@@ -187,6 +207,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.secrets',
     domain: 'security',
     label: '硬编码密钥检测',
+    summary: 'gitleaks 识别硬编码密钥与访问令牌',
     status: 'implemented',
     implementedBy: ['security.scan.gitleaks.hardcoded-key'],
   },
@@ -194,6 +215,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.malware',
     domain: 'security',
     label: '恶意代码特征（反弹 Shell / 后门 / 供应链投毒）',
+    summary: '扫描反弹 Shell、后门与供应链投毒特征',
     status: 'implemented',
     // 实现证据是**恶意代码类型**（@zh/security 的启发式正则通道产出），
     // 不是 SOP 规则 id —— 那 3 条同名 SOP 规则是 draft/trial，从不求值。
@@ -214,6 +236,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.compliance',
     domain: 'security',
     label: '合规基线（ASVS L1 子集）',
+    summary: '把各域已落盘结论汇总为 ASVS L1 条款视图',
     status: 'implemented',
     // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
     // 它把各域已落盘结论按标准条款汇总成五态，不启动任何扫描 —— 合规是**视图**，
@@ -224,6 +247,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.standard',
     domain: 'security',
     label: '安全编码规范检查',
+    summary: '代码规范检查归项目体检（ESLint / 类型安全）',
     status: 'deprecated',
     implementedBy: [],
     // 代码规范检查按 C1 唯一归属属项目体检（ESLint / 类型安全）；安全侧不再单列，
@@ -236,6 +260,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'security.dependency',
     domain: 'security',
     label: '依赖 CVE 检测',
+    summary: '依赖 CVE 检测唯一归依赖管家（OSV）',
     status: 'deprecated',
     implementedBy: [],
     note:
@@ -247,14 +272,28 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
   {
     id: 'garbage.unused-file',
     domain: 'garbage',
-    label: '无用文件与残留产物',
+    label: '无用文件与系统残留',
+    summary: '识别未引用资源、.DS_Store 与日志临时文件',
     status: 'implemented',
-    implementedBy: ['garbage.detect.fs'],
+    implementedBy: ['garbage.detect.fs', 'unused-file'],
+  },
+  {
+    // 从 garbage.unused-file 拆出来（2026-11-14）：文件系统检测器本来就把「残留 / 临时文件」
+    // 与「可再生成的构建产物目录」当两类产出（GarbageItemType 里也是两个类型、删除授权
+    // 口径不同），合在一张卡里说「残留产物」既含糊又少一张卡，《07》垃圾域一行也把
+    // 「构建产物」单列。拆开后四张卡与结果页的四类统计口径对齐。
+    id: 'garbage.build-artifact',
+    domain: 'garbage',
+    label: '构建产物（可再生目录）',
+    summary: 'dist / build / coverage 等可重新生成的目录',
+    status: 'implemented',
+    implementedBy: ['garbage.detect.fs', 'build-artifact'],
   },
   {
     id: 'garbage.dead-code',
     domain: 'garbage',
     label: '死代码（未使用的导出）',
+    summary: 'ts-prune 找出无人引用的导出',
     status: 'implemented',
     implementedBy: ['garbage.scan.cleanup.dead-code'],
   },
@@ -262,6 +301,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'garbage.unused-dependency',
     domain: 'garbage',
     label: '未使用依赖',
+    summary: 'depcheck 找出清单中未被引用的依赖',
     status: 'implemented',
     implementedBy: ['garbage.scan.cleanup.unused-dependency'],
   },
@@ -269,6 +309,7 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'garbage.duplicate-code',
     domain: 'garbage',
     label: '重复代码',
+    summary: '重复代码明细唯一归重构域',
     status: 'deprecated',
     implementedBy: [],
     note: '按《07》O1 唯一归重构域。垃圾页空态不得宣称此项。',
@@ -279,20 +320,35 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'refactor.duplicate-code',
     domain: 'refactor',
     label: '重复代码',
+    summary: 'jscpd 定位可合并的重复实现',
     status: 'implemented',
     implementedBy: ['duplicated-code'],
   },
   {
-    id: 'refactor.smells',
+    // 拆分（2026-11-14）：原先一张卡把函数级（long-method / deep-nesting）与
+    // 结构级（large-class / god-object）异味塞在一起，措辞「过长函数 / 圈复杂度 /
+    // 深层嵌套」只覆盖了前一半，等于把后一半藏起来。两类坏味道由不同探测器产出、
+    // 修复方式也不同，拆成两张卡既准确又补齐了 4 张卡版式。
+    id: 'refactor.smells.function',
     domain: 'refactor',
-    label: '代码异味（过长函数 / 圈复杂度 / 深层嵌套）',
+    label: '函数级异味',
+    summary: '检测过长函数、过长参数与深层嵌套',
     status: 'implemented',
-    implementedBy: ['long-method', 'deep-nesting', 'large-class', 'god-object'],
+    implementedBy: ['long-method', 'long-parameter-list', 'deep-nesting'],
+  },
+  {
+    id: 'refactor.smells.structure',
+    domain: 'refactor',
+    label: '结构级异味',
+    summary: '检测超大类、上帝对象与依恋情结',
+    status: 'implemented',
+    implementedBy: ['large-class', 'god-object', 'feature-envy'],
   },
   {
     id: 'refactor.auto-fix',
     domain: 'refactor',
     label: '一键应用推荐重构方案',
+    summary: '高置信问题一键改写，写盘前自动备份',
     status: 'implemented',
     // 实现证据 = 存在修复生成器（且检测器把它标为 autoFixable）的高置信坏味道类型。
     // 现这两类既有检测器（ruleId 可达），又有 auto-fix 生成器（auto-fix.ts 的 FIX_GENERATORS）。
@@ -309,7 +365,8 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
   {
     id: 'inspect.architecture',
     domain: 'inspect',
-    label: '架构规范（循环依赖 / 分层边界 / 模块依赖）',
+    label: '架构规范',
+    summary: '循环依赖 / 分层边界 / 模块依赖扫描，防止架构腐化',
     status: 'implemented',
     implementedBy: [
       'inspect.scan.depcruiser.circular-dependency',
@@ -320,7 +377,8 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
   {
     id: 'inspect.type-safety',
     domain: 'inspect',
-    label: '类型安全（真实 tsc 检查 + 空安全 / 类型一致性）',
+    label: '类型安全',
+    summary: '真实 tsc 类型检查，叠加空安全与类型一致性扫描',
     status: 'implemented',
     implementedBy: [
       'inspect.scan.typescript.type-error-check',
@@ -332,14 +390,16 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
   {
     id: 'inspect.code-style',
     domain: 'inspect',
-    label: '代码规范（严格模式 / 枚举使用）',
+    label: '代码规范',
+    summary: 'TS 严格模式配置、枚举与常量使用规范',
     status: 'implemented',
     implementedBy: ['inspect.scan.internal.strict-mode', 'inspect.scan.internal.enum-usage'],
   },
   {
     id: 'inspect.module-boundary',
     domain: 'inspect',
-    label: '模块边界与依赖注入合规',
+    label: '模块边界',
+    summary: '分层依赖方向、NestJS 模块边界与依赖注入合规',
     status: 'implemented',
     implementedBy: [
       'inspect.scan.ironnest.dependency-injection',

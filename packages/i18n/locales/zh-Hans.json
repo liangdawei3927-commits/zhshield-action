@@ -925,8 +925,8 @@
             "title": "自动同步"
           }
         },
-        "subtitle": "为项目配置与关键文件保留可回滚快照，支持本地与 GitHub 双通道",
-        "title": "保护重要配置，数据永不丢失"
+        "subtitle": "配置与关键文件留快照，本地与 GitHub 双通道",
+        "title": "配置随时可回滚"
       },
       "noRecords": "暂无备份记录",
       "oneClickBackup": "一键备份",
@@ -1002,8 +1002,8 @@
       "ecosystem": "生态",
       "empty": {
         "start": "开始盘点",
-        "subtitle": "解析锁文件与依赖清单，绘制依赖图谱并校验完整性",
-        "title": "管家盘点，看清图谱"
+        "subtitle": "核验依赖完整性、许可证与已知漏洞",
+        "title": "盘点依赖风险"
       },
       "env": "环境一致性",
       "env.actual": "实际：{{value}}",
@@ -1160,8 +1160,8 @@
       "dependencyHint": "未用依赖不自动删除，确认无引用后可从 package.json 手动移除",
       "done": "垃圾清理完成",
       "empty": {
-        "subtitle": "扫描未使用文件、冗余依赖与死代码",
-        "title": "清理无用文件，为项目减负"
+        "subtitle": "找出无用文件、构建产物与未用依赖",
+        "title": "清理项目垃圾"
       },
       "emptyList": "项目很干净，没有可清理的垃圾",
       "feature": {
@@ -1221,6 +1221,9 @@
       "copiedAll": "已复制全部 {{count}} 条问题，可粘贴到 AI 修复",
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
       "duration": "扫描耗时 {{duration}}ms",
+      "empty": {
+        "title": "守住每次提交"
+      },
       "falsePositiveCount": "误报反馈 {{count}} 条",
       "falsePositiveSubmitted": "已提交误报反馈，将用于校准规则",
       "feature": {
@@ -1245,7 +1248,7 @@
         "subtitle": "hook 自动触发 + 手动扫描落库",
         "title": "最近拦截记录"
       },
-      "idleSubtitle": "实时守护代码变更，在提交/推送/CI 关卡自动拦截",
+      "idleSubtitle": "提交、推送与 CI 三道关卡自动拦截",
       "lastBlockAt": "最近 {{time}}",
       "lastScan": "上次扫描 · {{time}}",
       "level": {
@@ -1313,8 +1316,8 @@
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
       "done": "巡检完成",
       "empty": {
-        "subtitle": "每天自动巡检架构规范与类型安全，也可点击一键体检",
-        "title": "体检项目架构与类型安全"
+        "subtitle": "巡检分层依赖、类型安全与代码规范",
+        "title": "架构与类型体检"
       },
       "feature": {
         "architecture": {
@@ -1405,8 +1408,8 @@
           "title": "定时器优化"
         },
         "start": "开始检测",
-        "subtitle": "扫描低效数组遍历、正则重复编译、冗余分配等性能问题",
-        "title": "检测运行时性能反模式，优化执行效率"
+        "subtitle": "检测低效循环、阻塞 IO、体积超标与正则回溯",
+        "title": "找出性能瓶颈"
       },
       "source": "性能",
       "suggestion": "建议：{{suggestion}}",
@@ -1416,6 +1419,7 @@
     },
     "refactor": {
       "addProjectFirst": "请先在仪表盘添加项目",
+      "fileCount": "{{count}} 个文件",
       "groupedIssues": "重构问题（按类型分组）",
       "groupsSummary": "{{groups}} 类 · {{total}} 处",
       "header": {
@@ -1449,8 +1453,8 @@
           "desc": "检测重复代码、过长函数、高圈复杂度等问题",
           "title": "代码异味"
         },
-        "subtitle": "每天自动检查一次代码重复、代码异味、过长函数等，一键应用推荐重构方案",
-        "title": "优化代码结构，消除技术债务"
+        "subtitle": "查重复代码与坏味道，一键应用推荐方案",
+        "title": "消除代码异味"
       },
       "smell": {
         "callbackHell": "回调地狱",
@@ -1530,6 +1534,10 @@
       },
       "empty": {
         "feature": {
+          "gate": {
+            "title": "门禁结论",
+            "desc": "汇总提交 / 推送 / CI 门禁结论，看清是否可放行"
+          },
           "module": {
             "title": "模块级评分",
             "desc": "按项目画像拆分到各模块，分别给出健康得分"
@@ -1543,8 +1551,8 @@
             "title": "趋势对比"
           }
         },
-        "subtitle": "尚无评分报告 —— 跑一次项目体检，这里会沉淀每次的健康分与趋势",
-        "title": "多维度分析报告，决策更有依据"
+        "subtitle": "尚无报告，跑一次体检后在这里看趋势",
+        "title": "看清质量趋势"
       },
       "generate": "汇总生成报告",
       "generating": "生成中...",
@@ -1688,8 +1696,8 @@
       "copyAllPrompt": "{{count}} 项需处理，可一键复制全部到 AI 修复",
       "done": "安全检查完成",
       "empty": {
-        "subtitle": "多引擎深度扫描漏洞与恶意代码，结果与工具可用性一并呈现",
-        "title": "深度扫描漏洞，修复安全隐患"
+        "subtitle": "多引擎扫描漏洞、恶意代码与硬编码密钥",
+        "title": "扫清安全隐患"
       },
       "feature": {
         "dependency": {
@@ -1796,10 +1804,10 @@
           "desc": "文件变更 / 日志 / 运行进程，按项目自动探测",
           "title": "三源监控"
         },
-        "subtitleIdle": "当前监控 0 个文件，点击下方按钮启动",
-        "subtitleMonitoring": "监控中（自动，7×24）——正在守护当前项目",
-        "titleIdle": "24小时无间断监控，异常无所遁形",
-        "titleMonitoring": "监控已启动，异常无所遁形"
+        "subtitleIdle": "点击下方按钮，开始守护当前项目",
+        "subtitleMonitoring": "7×24 守护文件、日志与进程异常",
+        "titleIdle": "监控未启动",
+        "titleMonitoring": "监控运行中"
       },
       "source": {
         "backend": "后端",
@@ -1862,8 +1870,8 @@
       },
       "empty": {
         "start": "开始盘点",
-        "subtitle": "分析扫描问题与模块热度，估算利息与本金，按 ROI 排序给出偿还建议",
-        "title": "量化技术债，把评分变成行动"
+        "subtitle": "估算利息与本金，按 ROI 排出偿还顺序",
+        "title": "量化技术债"
       },
       "errorTitle": "盘点失败",
       "factor": {

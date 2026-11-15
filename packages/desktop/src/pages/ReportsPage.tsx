@@ -17,9 +17,11 @@ interface ReportsPageProps {
 }
 
 /**
- * 空态页的三条特性说明（评分配置 / 趋势追踪 / 模块视角）。
+ * 空态页的四条特性说明（多维度评分 / 趋势对比 / 模块级评分 / 门禁结论）。
  *
  * 纯展示配置，与页面状态无关 —— 抽到模块级只为让 `ReportsPage` 只保留分支逻辑。
+ * 四条对应报告页真实存在的四块内容（评分总览 / 历史曲线 / 模块评分 / 门禁结论），
+ * 底部卡片全站固定 4 列，缺一条就会空出半格。
  */
 function buildReportFeatures(t: ReturnType<typeof useT>) {
   return [
@@ -52,6 +54,16 @@ function buildReportFeatures(t: ReturnType<typeof useT>) {
       ),
       title: t('page.reports.empty.feature.module.title'),
       desc: t('page.reports.empty.feature.module.desc'),
+    },
+    {
+      icon: (
+        <FeatureIcon>
+          <path d="M12 2L4 6v6c0 5 3.4 9.7 8 10 4.6-.3 8-5 8-10V6l-8-4z" />
+          <path d="M9 12l2 2 4-4" />
+        </FeatureIcon>
+      ),
+      title: t('page.reports.empty.feature.gate.title'),
+      desc: t('page.reports.empty.feature.gate.desc'),
     },
   ];
 }
@@ -114,7 +126,6 @@ export function ReportsPage({ projectPath }: ReportsPageProps) {
       title={t('page.reports.empty.title')}
       subtitle={t('page.reports.empty.subtitle')}
       featureList={buildReportFeatures(t)}
-      columns={3}
       buttonText={t('page.reports.generate')}
       onAction={handleNewReport}
       actionDomain="reports"

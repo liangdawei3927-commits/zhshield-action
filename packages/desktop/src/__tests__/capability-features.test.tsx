@@ -56,18 +56,18 @@ describe('能力清单渲染 — 只渲染已实现的能力', () => {
     }
   });
 
-  it('性能域宣称 ReDoS（已实现），但不得宣称现代化 API / 定时器优化（无实现）', () => {
+  it('性能域宣称运行时反模式（含 ReDoS），但不得宣称现代化 API / 定时器优化（无实现）', () => {
     const ids = buildCapabilityFeatures('performance', {
       icons: Object.fromEntries(
         implementedCapabilities('performance').map((c) => [c.id, <span key={c.id}>x</span>]),
       ),
     }).map((f) => f.id);
 
-    // ReDoS 已由原生 RedosDetectorImpl 落地，可在性能页宣称
-    expect(ids).toContain('performance.redos');
+    // ReDoS 已由原生 RedosDetectorImpl 落地；它与嵌套循环 / 同步阻塞 IO 同属
+    // 「运行时反模式」，合并成一张卡（证据里仍逐条列出，见注册表测试）
+    expect(ids).toContain('performance.runtime');
     expect(ids).not.toContain('performance.modern-api');
     expect(ids).not.toContain('performance.timer');
-    expect(ids).toContain('performance.runtime.nested-loop');
   });
 
   it('安全域不得宣称「规范检查」与「依赖检查」（前者无实现、后者已移交依赖域）', () => {
@@ -101,7 +101,46 @@ describe('能力清单渲染 — 只渲染已实现的能力', () => {
     // 一键应用已由 @zh/refactor 生成器 + 桌面端链路落地（2026-11-03）
     expect(ids).toContain('refactor.auto-fix');
     expect(ids).toContain('refactor.duplicate-code');
-    expect(ids).toContain('refactor.smells');
+    // 异味拆成函数级 / 结构级两张卡（各由不同探测器产出）
+    expect(ids).toContain('refactor.smells.function');
+    expect(ids).toContain('refactor.smells.structure');
+  });
+
+  it('接入空态网格的四域，卡片主标题在 4 列网格里放得下一行', () => {
+    // 主标题固定单行（EntryCard md 用 truncate），超宽会被省略号截断。
+    // 4 列网格在默认窗口（1440 宽）下单卡文字区约 244px，text-sm 约容纳 17 个汉字；
+    // 这里按「汉字 1 单位 / ASCII 0.55 单位」折算并留出余量，取 13 单位上限。
+    // 写长了不是排版问题而是文案问题：明细应挪到 summary 那行，而不是塞进标题括号。
+    const widthOf = (text: string): number =>
+      [...text].reduce((sum, ch) => sum + (ch.charCodeAt(0) < 128 ? 0.55 : 1), 0);
+
+    for (const domain of ['inspect', 'garbage', 'performance', 'refactor'] as const) {
+      const features = buildCapabilityFeatures(domain, {
+        icons: Object.fromEntries(
+          implementedCapabilities(domain).map((c) => [c.id, <span key={c.id}>x</span>]),
+        ),
+      });
+      for (const f of features) {
+        expect(
+          widthOf(f.title),
+          `${domain}/${f.id} 的标题「${f.title}」过宽，会在卡片里被截断；明细请写进 summary`,
+        ).toBeLessThanOrEqual(13);
+      }
+    }
+  });
+
+  it('接入空态网格的四域，每域恰好 4 张能力卡（底部版式全站统一）', () => {
+    // 版式统一是产品要求（2026-11-14）：底部卡片固定 4 列，某页多一张会掉到第二行、
+    // 少一张会空出半格。注册表能力增减时，这里必须同步调整卡片口径 ——
+    // 要么合并（同属一类的实现证据并成一张卡），要么拆开（不同探测器产出的分开）。
+    for (const domain of ['inspect', 'garbage', 'performance', 'refactor'] as const) {
+      const features = buildCapabilityFeatures(domain, {
+        icons: Object.fromEntries(
+          implementedCapabilities(domain).map((c) => [c.id, <span key={c.id}>x</span>]),
+        ),
+      });
+      expect(features.map((f) => f.id), `${domain} 域的底部卡片数不是 4`).toHaveLength(4);
+    }
   });
 });
 

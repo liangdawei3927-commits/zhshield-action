@@ -20,11 +20,12 @@
  * 就等于有了第二份口径 —— 那正是本组件要消灭的东西。
  *
  * 代价与收益：
- *   · 代价：文案从 i18n 改为注册表里的 `label`（中文），失去多语言。
+ *   · 代价：文案从 i18n 改为注册表里的 `label` / `summary`（中文），失去多语言。
  *     这是**有意的取舍**：能力清单当前只有 zh-Hans 有内容（其余语言包未同步），
- *     而"宣称了却没有"比"文案没翻译"严重得多。
+ *     而"宣称了却没有"比"文案没翻译"严重得多；两行同源还顺带消除了
+ *     「标题没翻译、说明翻了」的错位。
  *   · 收益：新增能力只需在注册表登记；忘记实现 → 测试变红；
- *     UI 永远不会宣称未实现的能力。
+ *     UI 永远不会宣称未实现的能力；四页的卡片文案口径只有一处。
  */
 
 import type { ReactNode } from 'react';
@@ -44,19 +45,22 @@ export interface CapabilityFeatureItem {
   icon: ReactNode;
 }
 
-/** 能力注册表里的能力 → 展示项（文案取自注册表，图标由调用方提供） */
+/** 能力注册表里的能力 → 展示项（两行文案都取自注册表，图标由调用方提供） */
 export interface CapabilityFeatureSource {
   /** 能力 id → 图标 */
   icons: Readonly<Record<string, ReactNode>>;
-  /** 能力 id → 说明文案（可选；缺省用注册表的 label） */
-  descriptions?: Readonly<Record<string, string>>;
 }
 
 /**
  * 取某域已实现的能力，并组装成展示项。
  *
+ * 标题与说明都取自注册表（`label` / `summary`）—— 不再接受调用方覆盖说明：
+ * 之前允许按能力 id 传 i18n 说明，但四个接入本组件的域里有三页缺键，
+ * 缺键的卡片就把标题原样当说明渲染（垃圾清理 / 性能优化 / 代码重构实测），
+ * 同一行卡片里一半有说明、一半是标题复读。现在两行同源，缺说明会在注册表测试里变红。
+ *
  * @param domain  治理域
- * @param source  图标与补充文案
+ * @param source  图标
  */
 export function buildCapabilityFeatures(
   domain: DomainId,
@@ -66,7 +70,7 @@ export function buildCapabilityFeatures(
   return caps.map((cap) => ({
     id: cap.id,
     title: cap.label,
-    desc: source.descriptions?.[cap.id] ?? cap.label,
+    desc: cap.summary,
     icon: source.icons[cap.id] ?? <span key={cap.id} />,
   }));
 }

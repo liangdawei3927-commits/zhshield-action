@@ -132,19 +132,13 @@ export function InspectEmptyView(props: ScanEmptyStateParams & { t: Translate })
       title={props.t('page.inspect.empty.title')}
       subtitle={props.t('page.inspect.empty.subtitle')}
       features={buildCapabilityFeatures('inspect', {
-        // 图标按能力 id 绑定：注册表决定**渲染哪几项**，图标只负责视觉。
+        // 图标按能力 id 绑定：注册表决定**渲染哪几项**，图标只负责视觉；
+        // 标题与说明都取自注册表，避免一半卡片有说明、一半复读标题。
         icons: {
           'inspect.architecture': <ArchitectureIcon />,
           'inspect.module-boundary': <ModuleBoundaryIcon />,
           'inspect.type-safety': <TypeSafetyIcon />,
           'inspect.code-style': <CodeStyleIcon />,
-        },
-        // 说明文案沿用既有 i18n（能力名取注册表，说明保留本地化）
-        descriptions: {
-          'inspect.architecture': props.t('page.inspect.feature.architecture.desc'),
-          'inspect.module-boundary': props.t('page.inspect.feature.moduleBoundary.desc'),
-          'inspect.type-safety': props.t('page.inspect.feature.typeSafety.desc'),
-          'inspect.code-style': props.t('page.inspect.feature.codeStyle.desc'),
         },
       })}
       buttonText={props.t('page.inspect.scanNow')}

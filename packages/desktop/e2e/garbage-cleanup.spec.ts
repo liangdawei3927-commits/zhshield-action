@@ -152,7 +152,7 @@ test.describe('垃圾清理功能 E2E', () => {
 
     // 进入垃圾清理页（空态）
     await navBar(page).getByRole('button', { name: '垃圾清理' }).click();
-    await expect(page.getByText('清理无用文件，为项目减负')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('清理项目垃圾')).toBeVisible({ timeout: 15_000 });
 
     // ① 扫描
     await page.getByRole('button', { name: '开始扫描' }).click();

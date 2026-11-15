@@ -218,7 +218,7 @@ function PerformanceEmptyView({
       features={buildCapabilityFeatures('performance', {
         // 图标按能力 id 绑定：注册表决定**渲染哪几项**，图标只负责视觉
         icons: {
-          'performance.runtime.nested-loop': (
+          'performance.runtime': (
             <FeatureIcon>
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </FeatureIcon>
@@ -236,13 +236,6 @@ function PerformanceEmptyView({
           'performance.tree-shaking': (
             <FeatureIcon>
               <path d="M12 2L4 6v6c0 5 3.4 9.7 8 10 4.6-.3 8-5 8-10V6l-8-4z" />
-            </FeatureIcon>
-          ),
-          'performance.redos': (
-            <FeatureIcon>
-              <path d="M12 2L4 6v6c0 5 3.4 9.7 8 10 4.6-.3 8-5 8-10V6l-8-4z" />
-              <path d="M12 8v4" />
-              <path d="M12 16h.01" />
             </FeatureIcon>
           ),
         },

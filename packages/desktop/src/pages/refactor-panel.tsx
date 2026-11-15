@@ -237,35 +237,65 @@ export function SmellDetailList({
   );
 }
 
-/** 「需重构文件 / 高优先级」统计卡明细：文件行（优先级 + 路径 + 异味数 + 可维护性） */
-export function RefactorFileDetailList({ files }: { files: RefactorFile[] }) {
+/**
+ * 「需重构文件 / 高优先级」统计卡明细：**一张卡**，与「重构问题（按类型分组）」
+ * 的分类卡同形 —— 头部左侧是分类徽标 + 文件数，右侧「全部复制到 AI」，
+ * 卡片内是文件行（优先级 + 路径 + 异味数 + 可维护性）。
+ *
+ * 复制是整表一次：一个文件条目 = 该文件要重构，复制内容是**所有文件的所有
+ * 异味**（只给路径 AI 不知道改哪里）。不做逐行复制 —— 明细动辄上百行，
+ * 逐个点不现实。
+ */
+export function RefactorFileDetailList({
+  files,
+  label,
+  onCopyAll,
+}: {
+  files: RefactorFile[];
+  /** 卡片头部徽标文案（来自统计卡标题：需重构文件 / 高优先级） */
+  label: string;
+  onCopyAll: (files: readonly RefactorFile[]) => void;
+}) {
   const t = useT();
   if (files.length === 0) return <DetailEmpty />;
   return (
-    <div className="flex flex-col gap-2">
-      {files.map((file) => {
-        const priority = PRIORITY_STYLE[file.refactorPriority] ?? PRIORITY_STYLE.low;
-        return (
-          <div key={file.filePath} className="flex items-center gap-3 p-3 rounded-lg bg-zh-panel">
-            <span
-              className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white shrink-0"
-              style={{ background: priority.bg }}
-            >
-              {t(priority.key, { defaultValue: priority.fallback })}
-            </span>
-            <p className="flex-1 min-w-0 text-[11px] text-zh-muted font-mono truncate">
-              {file.filePath}
-            </p>
-            <span className="text-xs text-zh-ink-2 shrink-0">
-              {t('page.refactor.smellCount', { count: file.totalSmells })}
-            </span>
-            <span className="text-[11px] text-zh-muted shrink-0">
-              {t('page.refactor.maintainability', { defaultValue: '可维护性' })}
-              {file.maintainabilityScore}
-            </span>
-          </div>
-        );
-      })}
-    </div>
+    <ResultCard variant="score">
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="px-2 py-0.5 rounded text-xs font-semibold text-white bg-info-600 shrink-0">
+            {label}
+          </span>
+          <span className="text-xs text-zh-muted shrink-0">
+            {t('page.refactor.fileCount', { count: files.length })}
+          </span>
+        </div>
+        <CopyAllToAiButton onClick={() => onCopyAll(files)} />
+      </div>
+      <div className="flex flex-col gap-2">
+        {files.map((file) => {
+          const priority = PRIORITY_STYLE[file.refactorPriority] ?? PRIORITY_STYLE.low;
+          return (
+            <div key={file.filePath} className="flex items-center gap-3 p-3 rounded-lg bg-zh-panel">
+              <span
+                className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white shrink-0"
+                style={{ background: priority.bg }}
+              >
+                {t(priority.key, { defaultValue: priority.fallback })}
+              </span>
+              <p className="flex-1 min-w-0 text-[11px] text-zh-muted font-mono truncate">
+                {file.filePath}
+              </p>
+              <span className="text-xs text-zh-ink-2 shrink-0">
+                {t('page.refactor.smellCount', { count: file.totalSmells })}
+              </span>
+              <span className="text-[11px] text-zh-muted shrink-0">
+                {t('page.refactor.maintainability', { defaultValue: '可维护性' })}
+                {file.maintainabilityScore}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </ResultCard>
   );
 }

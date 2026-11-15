@@ -50,12 +50,19 @@ const SIZE: Record<
     title: 'text-sm font-medium text-zh-ink truncate',
     sub: 'text-base font-bold leading-none mt-1',
   },
-  /** 空态页功能引导：中号图标块、标题 + 描述（图标块品牌浅色底，与白卡分层） */
+  /**
+   * 空态页功能引导：中号图标块、标题 + 描述（图标块品牌浅色底，与白卡分层）。
+   *
+   * 主标题 `truncate`（2026-11-14）：底部卡片是 4 列固定网格，标题一旦换行，
+   * 同一行里有的卡两行、有的一行，看着像两种卡片（项目体检页四个标题里曾有两个折行）。
+   * 单行 + 省略号至少是「整齐的窄」；真正要保证不触发省略号，靠标签本身写短
+   * （能力注册表的 label 就是卡片标题，详情放 summary 那行）。
+   */
   md: {
     cardVariant: 'item',
     iconBox:
       'shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-brand-700 bg-brand-50 shadow-sm',
-    title: 'text-sm font-semibold text-zh-ink leading-tight',
+    title: 'text-sm font-semibold text-zh-ink leading-tight truncate',
     sub: 'text-[11px] text-zh-muted mt-0.5 leading-relaxed',
   },
 };

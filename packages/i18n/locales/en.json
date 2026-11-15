@@ -925,8 +925,8 @@
             "title": "Auto sync"
           }
         },
-        "subtitle": "Keeps rollback-ready snapshots of project config and key files, on local and GitHub channels",
-        "title": "Protect important config; your data never gets lost"
+        "subtitle": "Rollback-ready snapshots of config and key files, local and on GitHub",
+        "title": "Snapshot config any time"
       },
       "noRecords": "No backup records yet",
       "oneClickBackup": "One-click backup",
@@ -1002,8 +1002,8 @@
       "ecosystem": "Ecosystem",
       "empty": {
         "start": "Start inventory",
-        "subtitle": "Parses lockfiles and manifests, builds the dependency graph, and verifies integrity",
-        "title": "Inventory dependencies, see the full picture"
+        "subtitle": "Verifies lockfile integrity, licenses, and known vulnerabilities",
+        "title": "Inventory dependency risks"
       },
       "env": "Environment consistency",
       "env.actual": "Actual: {{value}}",
@@ -1160,8 +1160,8 @@
       "dependencyHint": "Unused dependencies are not deleted automatically; remove them manually from package.json once you've confirmed they're unreferenced",
       "done": "Garbage cleanup complete",
       "empty": {
-        "subtitle": "Scans for unused files, redundant dependencies, and dead code",
-        "title": "Clear out useless files, lighten your project"
+        "subtitle": "Finds unused files, build artifacts, and unused dependencies",
+        "title": "Clear out project junk"
       },
       "emptyList": "The project is clean; nothing to clean up",
       "feature": {
@@ -1221,6 +1221,9 @@
       "copiedAll": "Copied all {{count}} issues; paste them into AI to fix",
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "duration": "Scan took {{duration}}ms",
+      "empty": {
+        "title": "Commit guard"
+      },
       "falsePositiveCount": "{{count}} false positive reports",
       "falsePositiveSubmitted": "False positive report submitted; it will be used to calibrate rules",
       "feature": {
@@ -1245,7 +1248,7 @@
         "subtitle": "Hook auto-trigger + manual scans persisted to DB",
         "title": "Recent blocks"
       },
-      "idleSubtitle": "Watches code changes in real time, auto-blocks at commit/push/CI checkpoints",
+      "idleSubtitle": "Auto-blocks issues at commit, push, and CI checkpoints",
       "lastBlockAt": "Last {{time}}",
       "lastScan": "Last scan · {{time}}",
       "level": {
@@ -1313,8 +1316,8 @@
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Inspection complete",
       "empty": {
-        "subtitle": "Auto-inspects architecture and type safety daily; run a one-click checkup anytime",
-        "title": "Check architecture and type safety"
+        "subtitle": "Scans layer boundaries, type safety, and code style",
+        "title": "Architecture & type check"
       },
       "feature": {
         "architecture": {
@@ -1405,8 +1408,8 @@
           "title": "Timer optimization"
         },
         "start": "Start check",
-        "subtitle": "Scans for inefficient array traversal, repeated regex compilation, redundant allocations, and other performance issues",
-        "title": "Detect runtime performance anti-patterns, optimize execution efficiency"
+        "subtitle": "Detects inefficient loops, blocking IO, oversized bundles, and ReDoS",
+        "title": "Find performance bottlenecks"
       },
       "source": "Performance",
       "suggestion": "Suggestion: {{suggestion}}",
@@ -1416,6 +1419,7 @@
     },
     "refactor": {
       "addProjectFirst": "Add a project on the dashboard first",
+      "fileCount": "{{count}} files",
       "groupedIssues": "Refactor issues (grouped by type)",
       "groupsSummary": "{{groups}} types · {{total}} items",
       "header": {
@@ -1449,8 +1453,8 @@
           "desc": "Detects duplicate code, oversized functions, high cyclomatic complexity, and more",
           "title": "Code smells"
         },
-        "subtitle": "Daily checks for code duplication, smells, oversized functions, etc.; apply recommended refactorings in one click",
-        "title": "Optimize code structure, eliminate technical debt"
+        "subtitle": "Finds duplication and smells; applies recommended fixes in one click",
+        "title": "Remove code smells"
       },
       "smell": {
         "callbackHell": "Callback Hell",
@@ -1530,6 +1534,10 @@
       },
       "empty": {
         "feature": {
+          "gate": {
+            "title": "Gate verdicts",
+            "desc": "Aggregates pre-commit, pre-push, and CI gate verdicts in one place"
+          },
           "module": {
             "title": "Module scores",
             "desc": "Splits health scores per module based on the project profile"
@@ -1543,8 +1551,8 @@
             "title": "Trend comparison"
           }
         },
-        "subtitle": "No score reports yet — run a project inspection and every health score and trend lands here",
-        "title": "Multi-dimension analysis reports, better decisions"
+        "subtitle": "No reports yet; run an inspection and trends land here",
+        "title": "See quality trends"
       },
       "generate": "Summarize report",
       "generating": "Generating...",
@@ -1688,8 +1696,8 @@
       "copyAllPrompt": "{{count}} items need attention; copy them all to AI in one click to fix",
       "done": "Security check complete",
       "empty": {
-        "subtitle": "Multi-engine deep scan for vulnerabilities and malware; results are shown together with tool availability",
-        "title": "Deep-scan vulnerabilities, fix security issues"
+        "subtitle": "Multi-engine scan for vulnerabilities, malware, and hardcoded secrets",
+        "title": "Clear security issues"
       },
       "feature": {
         "dependency": {
@@ -1796,10 +1804,10 @@
           "desc": "File changes, logs and processes — auto-detected per project",
           "title": "Three monitor sources"
         },
-        "subtitleIdle": "Currently monitoring 0 files; click the button below to start",
-        "subtitleMonitoring": "Monitoring (automatic, 7×24) — guarding the current project",
-        "titleIdle": "24/7 uninterrupted monitoring, nothing escapes",
-        "titleMonitoring": "Monitoring started, nothing escapes"
+        "subtitleIdle": "Click the button below to start guarding this project",
+        "subtitleMonitoring": "Guards files, logs, and processes 24/7",
+        "titleIdle": "Monitoring off",
+        "titleMonitoring": "Monitoring on"
       },
       "source": {
         "backend": "Backend",
@@ -1862,8 +1870,8 @@
       },
       "empty": {
         "start": "Start inventory",
-        "subtitle": "Analyzes scan issues and module hotness, estimates interest and principal, and ranks repayment suggestions by ROI",
-        "title": "Quantify tech debt, turn scores into action"
+        "subtitle": "Estimates interest and principal; ranks payback by ROI",
+        "title": "Quantify tech debt"
       },
       "errorTitle": "Inventory failed",
       "factor": {

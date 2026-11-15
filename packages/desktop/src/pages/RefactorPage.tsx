@@ -104,6 +104,8 @@ interface SmellGroupsViewProps {
 interface RefactorReportViewProps extends SmellGroupsViewProps, AsyncScanActionProps {
   projectPath: string;
   t: RefactorT;
+  /** 文件清单「全部复制到AI」（「需重构文件 / 高优先级」两张卡的明细用） */
+  copyFilesToAi: RefactorState['copyFilesToAi'];
   onRescan: () => void;
   onBackHome: () => void;
   /** 是否正在应用自动修复 */
@@ -124,6 +126,7 @@ function RefactorReportView({
   t,
   report,
   loading,
+  copyFilesToAi,
   queued,
   onCancel,
   stopping,
@@ -155,7 +158,7 @@ function RefactorReportView({
       onCancel={onCancel}
       stopping={stopping}
       onBackHome={onBackHome}
-      stats={refactorReportStats(t, report, copyToAi)}
+      stats={refactorReportStats(t, report, copyToAi, copyFilesToAi)}
     >
       <RefactorGroupsSection
         t={t}
@@ -207,6 +210,7 @@ export function RefactorPage({ projectPath }: RefactorPageProps) {
         t={t}
         report={detail.detailReport}
         loading={page.loading}
+        copyFilesToAi={page.copyFilesToAi}
         queued={page.queued}
         onCancel={page.cancel}
         stopping={page.stopping}
@@ -259,6 +263,7 @@ export function refactorReportStats(
   t: RefactorT,
   report: NonNullable<RefactorState['report']>,
   copyToAi: RefactorState['copyToAi'],
+  copyFilesToAi: RefactorState['copyFilesToAi'],
 ): ReportStatCard[] {
   const files = report.files;
   // 「高优先级」数字来自引擎 summary.needsImmediateAction，口径是**文件级**
@@ -296,7 +301,13 @@ export function refactorReportStats(
         hint: t('page.refactor.stats.filesHint', {
           defaultValue: '存在代码异味的文件，含异味处数与可维护性评分',
         }),
-        render: (items) => <RefactorFileDetailList files={items as RefactorFile[]} />,
+        render: (items) => (
+          <RefactorFileDetailList
+            files={items as RefactorFile[]}
+            label={t('page.refactor.stats.files')}
+            onCopyAll={copyFilesToAi}
+          />
+        ),
       },
     },
     {
@@ -309,7 +320,13 @@ export function refactorReportStats(
         hint: t('page.refactor.stats.highPriorityHint', {
           defaultValue: '文件级优先级为「紧急 / 高」的文件，建议优先处理',
         }),
-        render: (items) => <RefactorFileDetailList files={items as RefactorFile[]} />,
+        render: (items) => (
+          <RefactorFileDetailList
+            files={items as RefactorFile[]}
+            label={t('page.refactor.stats.highPriority')}
+            onCopyAll={copyFilesToAi}
+          />
+        ),
       },
     },
   ];

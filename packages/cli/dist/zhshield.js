@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 992c4449a1ca23c4
+// @zh-src-hash: 88492e0b68264f4e
 // @zh-src-files: 435
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -5784,6 +5784,12 @@ var init_zh_Hans = __esm({
           selectAll: "\u5168\u9009",
           selectedCount: "\u5DF2\u9009 {{count}} \u9879",
           skippedNotice: "{{count}} \u9879\u68C0\u6D4B\u672A\u6267\u884C\uFF0C\u7ED3\u679C\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1A",
+          nestedProject: {
+            active: "\u672C\u6B21\u626B\u63CF\u5BF9\u8C61\uFF1A{{name}}\uFF08\u5B50\u9879\u76EE\uFF09\uFF0C\u4E0D\u662F\u9876\u90E8\u663E\u793A\u7684\u9879\u76EE",
+            back: "\u6539\u56DE\u5F53\u524D\u9879\u76EE",
+            hint: "\u5F53\u524D\u9879\u76EE\u6CA1\u6709\u53EF\u68C0\u6D4B\u7684\u4EE3\u7801\uFF08\u65E0 package.json / \u975E TypeScript \u9879\u76EE\uFF09\u3002\u68C0\u6D4B\u5230\u5B50\u9879\u76EE {{name}}\uFF0C\u662F\u5426\u6539\u626B\u5B83\uFF1F",
+            switch: "\u6539\u626B\u8BE5\u5B50\u9879\u76EE"
+          },
           notDetected: "\u672A\u68C0\u6D4B",
           notDetectedHint: "\u672C\u7EF4\u5EA6\u672A\u6267\u884C\uFF1A{{reason}}\u3002\u672A\u68C0\u6D4B \u2260 \u6CA1\u6709\u95EE\u9898\uFF0C\u4FEE\u590D\u5DE5\u5177\u6216\u91CD\u65B0\u626B\u63CF\u540E\u53EF\u83B7\u5F97\u7ED3\u679C\u3002",
           notDetectedNoProducer: "\u672C\u57DF\u672A\u767B\u8BB0\u8986\u76D6\u8BE5\u7C7B\u578B\u7684\u68C0\u6D4B\u9879",
@@ -8113,6 +8119,12 @@ var init_zh_Hant = __esm({
           selectAll: "\u5168\u9078",
           selectedCount: "\u5DF2\u9078 {{count}} \u9805",
           skippedNotice: "{{count}} \u9805\u6AA2\u6E2C\u672A\u57F7\u884C\uFF0C\u7D50\u679C\u53EF\u80FD\u4E0D\u5B8C\u6574\uFF1A",
+          nestedProject: {
+            active: "\u672C\u6B21\u6383\u63CF\u5C0D\u8C61\uFF1A{{name}}\uFF08\u5B50\u5C08\u6848\uFF09\uFF0C\u4E0D\u662F\u9802\u90E8\u986F\u793A\u7684\u5C08\u6848",
+            back: "\u6539\u56DE\u76EE\u524D\u5C08\u6848",
+            hint: "\u76EE\u524D\u5C08\u6848\u6C92\u6709\u53EF\u6AA2\u6E2C\u7684\u7A0B\u5F0F\u78BC\uFF08\u7121 package.json / \u975E TypeScript \u5C08\u6848\uFF09\u3002\u5075\u6E2C\u5230\u5B50\u5C08\u6848 {{name}}\uFF0C\u662F\u5426\u6539\u6383\u5B83\uFF1F",
+            switch: "\u6539\u6383\u8A72\u5B50\u5C08\u6848"
+          },
           notDetected: "\u672A\u6AA2\u6E2C",
           notDetectedHint: "\u672C\u7DAD\u5EA6\u672A\u57F7\u884C\uFF1A{{reason}}\u3002\u672A\u6AA2\u6E2C \u2260 \u6C92\u6709\u554F\u984C\uFF0C\u4FEE\u5FA9\u5DE5\u5177\u6216\u91CD\u65B0\u6383\u63CF\u5F8C\u53EF\u7372\u5F97\u7D50\u679C\u3002",
           notDetectedNoProducer: "\u672C\u57DF\u672A\u767B\u8A18\u6DB5\u84CB\u8A72\u985E\u578B\u7684\u6AA2\u6E2C\u9805",
@@ -91712,7 +91724,7 @@ var require_posix = __commonJS({
     function isPosixPathSeparator(code) {
       return code === CHAR_FORWARD_SLASH;
     }
-    function basename7(path83, suffix = "") {
+    function basename8(path83, suffix = "") {
       if (path83 instanceof URL) {
         path83 = fromFileUrl(path83);
       }
@@ -92375,7 +92387,7 @@ var require_posix = __commonJS({
     exports2.DELIMITER = DELIMITER;
     exports2.SEPARATOR = SEPARATOR;
     exports2.SEPARATOR_PATTERN = SEPARATOR_PATTERN;
-    exports2.basename = basename7;
+    exports2.basename = basename8;
     exports2.common = common;
     exports2.dirname = dirname29;
     exports2.extname = extname9;
@@ -92487,7 +92499,7 @@ var require_windows = __commonJS({
       }
       return path83;
     }
-    function basename7(path83, suffix = "") {
+    function basename8(path83, suffix = "") {
       if (path83 instanceof URL) {
         path83 = fromFileUrl(path83);
       }
@@ -93448,7 +93460,7 @@ var require_windows = __commonJS({
     exports2.DELIMITER = DELIMITER;
     exports2.SEPARATOR = SEPARATOR;
     exports2.SEPARATOR_PATTERN = SEPARATOR_PATTERN;
-    exports2.basename = basename7;
+    exports2.basename = basename8;
     exports2.common = common;
     exports2.dirname = dirname29;
     exports2.extname = extname9;
@@ -117868,7 +117880,7 @@ var require_jiti = __commonJS({
         }, pathe_M_eThtNZ_dirname = function(e3) {
           const t4 = pathe_M_eThtNZ_normalizeWindowsPath(e3).replace(/\/$/, "").split("/").slice(0, -1);
           return 1 === t4.length && Je.test(t4[0]) && (t4[0] += "/"), t4.join("/") || (isAbsolute12(e3) ? "/" : ".");
-        }, basename7 = function(e3, t4) {
+        }, basename8 = function(e3, t4) {
           const i2 = pathe_M_eThtNZ_normalizeWindowsPath(e3).split("/");
           let n2 = "";
           for (let e4 = i2.length - 1; e4 >= 0; e4--) {
@@ -118589,7 +118601,7 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
           if (!e3.opts.fsCache || !t4.filename) return i2();
           const n2 = ` /* v${Ti}-${utils_hash(t4.source, 16)} */
 `;
-          let a2 = `${basename7(pathe_M_eThtNZ_dirname(t4.filename))}-${(function(e4) {
+          let a2 = `${basename8(pathe_M_eThtNZ_dirname(t4.filename))}-${(function(e4) {
             const t5 = e4.split(Wt).pop();
             if (!t5) return;
             const i3 = t5.lastIndexOf(".");
@@ -118635,7 +118647,7 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
           return i2.startsWith("#!") && (i2 = "// " + i2), i2;
         }
         function eval_evalModule(t4, i2, n2 = {}) {
-          const a2 = n2.id || (n2.filename ? basename7(n2.filename) : `_jitiEval.${n2.ext || (n2.async ? "mjs" : "js")}`), c2 = n2.filename || jitiResolve(t4, a2, { async: n2.async }), l2 = n2.ext || extname9(c2), y2 = n2.cache || t4.parentCache || {}, E2 = /\.[cm]?tsx?$/.test(l2), w2 = ".mjs" === l2 || ".js" === l2 && "module" === (function(e3) {
+          const a2 = n2.id || (n2.filename ? basename8(n2.filename) : `_jitiEval.${n2.ext || (n2.async ? "mjs" : "js")}`), c2 = n2.filename || jitiResolve(t4, a2, { async: n2.async }), l2 = n2.ext || extname9(c2), y2 = n2.cache || t4.parentCache || {}, E2 = /\.[cm]?tsx?$/.test(l2), w2 = ".mjs" === l2 || ".js" === l2 && "module" === (function(e3) {
             for (; e3 && "." !== e3 && "/" !== e3; ) {
               e3 = pathe_M_eThtNZ_join(e3, "..");
               try {
@@ -118683,7 +118695,7 @@ Default "index" lookups for the main are deprecated for ES modules.`, "Deprecati
                     (0, $e.mkdirSync)(n4, { recursive: true });
                   } catch {
                   }
-                  const a4 = pathe_M_eThtNZ_join(n4, `${basename7(i6, extname9(i6))}-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
+                  const a4 = pathe_M_eThtNZ_join(n4, `${basename8(i6, extname9(i6))}-${Date.now()}-${Math.random().toString(36).slice(2)}.mjs`);
                   return (0, $e.writeFileSync)(a4, t6), a4;
                 })(l3, n3), debug2(t5, "[esm]", "[tempfile]", c4), a3(pathToFileURL2(c4))), E3 = y3 ? a3(y3).catch((e3) => {
                   if ("ENAMETOOLONG" !== e3?.code) throw e3;
@@ -265432,9 +265444,9 @@ ${lanes.join("\n")}
             /*ignoreCase*/
             false
           )) {
-            const basename7 = getBaseFileName(a.fileName);
-            if (basename7 === "lib.d.ts" || basename7 === "lib.es6.d.ts") return 0;
-            const name = removeSuffix(removePrefix(basename7, "lib."), ".d.ts");
+            const basename8 = getBaseFileName(a.fileName);
+            if (basename8 === "lib.d.ts" || basename8 === "lib.es6.d.ts") return 0;
+            const name = removeSuffix(removePrefix(basename8, "lib."), ".d.ts");
             const index = libs.indexOf(name);
             if (index !== -1) return index + 1;
           }
@@ -329180,8 +329192,8 @@ ${options2.prefix}` : "\n" : options2.prefix
             }
           };
           for (const file of files) {
-            const basename7 = getBaseFileName(file);
-            if (basename7 === "package.json" || basename7 === "bower.json") {
+            const basename8 = getBaseFileName(file);
+            if (basename8 === "package.json" || basename8 === "bower.json") {
               createProjectWatcher(
                 file,
                 "FileWatcher"
@@ -332853,8 +332865,8 @@ All files are: ${JSON.stringify(names)}`,
               var _a;
               const fileOrDirectoryPath = removeIgnoredPath(this.toPath(fileOrDirectory));
               if (!fileOrDirectoryPath) return;
-              const basename7 = getBaseFileName(fileOrDirectoryPath);
-              if (((_a = result.affectedModuleSpecifierCacheProjects) == null ? void 0 : _a.size) && (basename7 === "package.json" || basename7 === "node_modules")) {
+              const basename8 = getBaseFileName(fileOrDirectoryPath);
+              if (((_a = result.affectedModuleSpecifierCacheProjects) == null ? void 0 : _a.size) && (basename8 === "package.json" || basename8 === "node_modules")) {
                 result.affectedModuleSpecifierCacheProjects.forEach((project) => {
                   var _a2;
                   (_a2 = project.getModuleSpecifierCache()) == null ? void 0 : _a2.clear();
@@ -506041,6 +506053,7 @@ function buildGarbageReport(input) {
     summary: { total: items.length, size, byType },
     checks,
     skipped: checks.filter((c) => !c.ran).length,
+    ...input.nestedProject ? { nestedProject: input.nestedProject } : {},
     timestamp: now().toISOString()
   };
 }
@@ -520285,6 +520298,14 @@ function resolveEffectiveProjectRoot(projectPath) {
   const candidates = listNestedProjectRootCandidates(root);
   return candidates.length === 1 ? candidates[0] : root;
 }
+function detectNestedProjectSuggestion(projectPath) {
+  const root = path67.resolve(projectPath);
+  if (fs62.existsSync(path67.join(root, "package.json"))) return null;
+  if (hasPythonManifest(root)) return null;
+  const candidates = listNestedProjectRootCandidates(root);
+  if (candidates.length !== 1) return null;
+  return { path: candidates[0], name: path67.basename(candidates[0]) };
+}
 function listNestedProjectRootCandidates(root) {
   let entries;
   try {
@@ -520596,11 +520617,13 @@ async function runGarbageDomain(ctx) {
       reason = `\u5783\u573E\u89C4\u5219\u901A\u9053\u5F02\u5E38\uFF0C\u964D\u7EA7\u4E3A\u4EC5\u6587\u4EF6\u7CFB\u7EDF\u68C0\u6D4B: ${err instanceof Error ? err.message : String(err)}`;
     }
   }
+  const nestedProject = detectNestedProjectSuggestion(ctx.repoRoot);
   const report = buildGarbageReport2({
     projectPath: ctx.repoRoot,
     fsItems,
     evaluations,
-    ruleChannelRan
+    ruleChannelRan,
+    ...nestedProject ? { nestedProject } : {}
   });
   return {
     report,

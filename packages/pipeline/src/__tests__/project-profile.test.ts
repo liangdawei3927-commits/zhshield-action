@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { detectProjectProfile, resolveEffectiveProjectRoot } from '../project-profile';
+import {
+  detectNestedProjectSuggestion,
+  detectProjectProfile,
+  resolveEffectiveProjectRoot,
+} from '../project-profile';
 import { deriveProjectFeature } from '../pipeline-runner-phase-helpers';
 
 describe('detectProjectProfile — M0 项目识别', () => {
@@ -214,5 +218,66 @@ describe('resolveEffectiveProjectRoot — 容器目录下探唯一嵌套仓库�
 
     // 不下探时容器画像为 unknown（无 language 字段）→ ts-prune 被裁剪；下探后应识别 typescript
     expect(deriveProjectFeature(container)?.language).toBe('typescript');
+  });
+});
+
+/**
+ * 子项目建议：只提示、不改判。
+ *
+ * 与 resolveEffectiveProjectRoot 的区别在于目标带 `.git` 时仍然给建议 ——
+ * 扫描根不会被改（那个函数负责"扫描根是谁"），本函数只负责"要不要问用户一句"。
+ */
+describe('detectNestedProjectSuggestion — 子项目建议（只提示不改判）', () => {
+  let tmpDir: string;
+
+  beforeAll(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zh-nested-suggest-'));
+  });
+
+  afterAll(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  function makeProjectDir(rel: string, pkg: Record<string, unknown>): string {
+    const dir = path.join(tmpDir, rel);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(pkg));
+    return dir;
+  }
+
+  it('容器含唯一嵌套项目 → 给出建议（路径 + 目录名）', () => {
+    const container = path.join(tmpDir, 'suggest-unique');
+    const nested = makeProjectDir('suggest-unique/inner-repo', { name: 'inner' });
+    fs.mkdirSync(container, { recursive: true });
+    fs.writeFileSync(path.join(container, 'readme.txt'), 'docs only');
+
+    expect(detectNestedProjectSuggestion(container)).toEqual({
+      path: nested,
+      name: 'inner-repo',
+    });
+  });
+
+  it('目标带 .git 且无清单 → 仍然给出建议（不参与扫描根解析，不构成改判）', () => {
+    const container = path.join(tmpDir, 'suggest-git-container');
+    makeProjectDir('suggest-git-container/inner-repo', { name: 'inner' });
+    fs.mkdirSync(path.join(container, '.git'), { recursive: true });
+
+    expect(detectNestedProjectSuggestion(container)?.name).toBe('inner-repo');
+    // 同一个目录：扫描根解析仍然不下探（两条语义分开，互不影响）
+    expect(resolveEffectiveProjectRoot(container)).toBe(container);
+  });
+
+  it('目标自身有 package.json → 不给建议', () => {
+    const project = makeProjectDir('suggest-self', { name: 'self' });
+    expect(detectNestedProjectSuggestion(project)).toBeNull();
+  });
+
+  it('多个候选 → 不猜测，不给建议', () => {
+    const container = path.join(tmpDir, 'suggest-multi');
+    makeProjectDir('suggest-multi/a', { name: 'a' });
+    makeProjectDir('suggest-multi/b', { name: 'b' });
+    fs.mkdirSync(container, { recursive: true });
+
+    expect(detectNestedProjectSuggestion(container)).toBeNull();
   });
 });

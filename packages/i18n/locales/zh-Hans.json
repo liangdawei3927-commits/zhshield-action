@@ -1191,6 +1191,12 @@
       "selectAll": "全选",
       "selectedCount": "已选 {{count}} 项",
       "skippedNotice": "{{count}} 项检测未执行，结果可能不完整：",
+      "nestedProject": {
+        "active": "本次扫描对象：{{name}}（子项目），不是顶部显示的项目",
+        "back": "改回当前项目",
+        "hint": "当前项目没有可检测的代码（无 package.json / 非 TypeScript 项目）。检测到子项目 {{name}}，是否改扫它？",
+        "switch": "改扫该子项目"
+      },
       "notDetected": "未检测",
       "notDetectedHint": "本维度未执行：{{reason}}。未检测 ≠ 没有问题，修复工具或重新扫描后可获得结果。",
       "notDetectedNoProducer": "本域未登记覆盖该类型的检测项",

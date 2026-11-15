@@ -24,7 +24,9 @@ import {
   CleanResultBanner,
   RestoreBanner,
   GarbageSkippedNotice,
+  NestedProjectNotice,
 } from './garbage-parts';
+import type { GarbageScanTarget } from './garbage-logic';
 import type {
   GarbageScanReportData,
   GarbageCleanResultData,
@@ -60,6 +62,11 @@ interface GarbageReportViewProps extends AsyncScanViewProps {
   handleClean: () => Promise<void>;
   handleRestore: () => Promise<void>;
   copyAllToAi: (items: GarbageScanReportData['items']) => void;
+  /** 报告给出的唯一子项目建议（目标本身无代码可查时） */
+  nestedSuggestion: GarbageScanTarget | null;
+  /** 当前扫描对象（null = 页面所属项目本身） */
+  scanTarget: GarbageScanTarget | null;
+  onSwitchScanTarget: (target: GarbageScanTarget | null) => void;
   t: (key: string, params?: Record<string, unknown>) => string;
 }
 
@@ -163,6 +170,9 @@ function GarbageReportView({
   handleClean,
   handleRestore,
   copyAllToAi,
+  nestedSuggestion,
+  scanTarget,
+  onSwitchScanTarget,
   t,
 }: GarbageReportViewProps) {
   const typeCards = buildGarbageTypeCards({ report, selected, t, copyAllToAi, toggleSelect });
@@ -185,6 +195,14 @@ function GarbageReportView({
       onBackHome={onBackHome}
       stats={garbageReportStats(report, typeCards, t)}
     >
+      {nestedSuggestion && (
+        <NestedProjectNotice
+          suggestion={nestedSuggestion}
+          active={scanTarget?.path === nestedSuggestion.path}
+          scanning={loading}
+          onSwitch={onSwitchScanTarget}
+        />
+      )}
       <GarbageSkippedNotice report={report} />
       {restoreResult && <RestoreBanner result={restoreResult} />}
       {cleanResult && (
@@ -208,6 +226,25 @@ function GarbageReportView({
   );
 }
 
+/** 空态参数：与 ScanEmptyStateBranch 的契约逐字对应（字段改名会在类型层立刻暴露） */
+function emptyStateParamsOf(
+  page: ReturnType<typeof useGarbagePage>,
+  detail: ReturnType<typeof useDomainDetailPage>,
+  projectPath: string,
+) {
+  return {
+    projectPath,
+    loading: page.loading,
+    progress: page.progress,
+    statusMessage: page.statusMessage,
+    queued: page.queued,
+    queuePosition: page.queuePosition,
+    onCancel: page.cancel,
+    stopping: page.stopping,
+    onScan: detail.startScan,
+  };
+}
+
 export function GarbagePage({ projectPath }: GarbagePageProps) {
   const t = useT();
   const page = useGarbagePage(projectPath);
@@ -223,17 +260,7 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
     onScan: handleScan,
   });
 
-  const emptyStateParams = {
-    projectPath,
-    loading: page.loading,
-    progress: page.progress,
-    statusMessage: page.statusMessage,
-    queued: page.queued,
-    queuePosition: page.queuePosition,
-    onCancel: page.cancel,
-    stopping: page.stopping,
-    onScan: detail.startScan,
-  };
+  const emptyStateParams = emptyStateParamsOf(page, detail, projectPath);
 
   if (detail.showSnapshot) {
     return (
@@ -268,6 +295,11 @@ export function GarbagePage({ projectPath }: GarbagePageProps) {
         handleClean={page.handleClean}
         handleRestore={page.handleRestore}
         copyAllToAi={page.copyAllToAi}
+        nestedSuggestion={page.nestedSuggestion}
+        scanTarget={page.scanTarget}
+        onSwitchScanTarget={(target) => {
+          void page.switchScanTarget(target);
+        }}
         t={t}
       />
     );

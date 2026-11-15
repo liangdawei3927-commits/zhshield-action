@@ -39,6 +39,8 @@ export interface BuildGarbageReportInput {
   evaluations?: GarbageEvaluationLike[];
   /** 该次是否跑了规则通道（用于区分"没有规则"与"规则通道异常"） */
   ruleChannelRan?: boolean;
+  /** 唯一子项目建议（只提示不改判；见 GarbageScanReport.nestedProject） */
+  nestedProject?: { path: string; name: string };
   now?: () => Date;
 }
 
@@ -63,6 +65,7 @@ export function buildGarbageReport(input: BuildGarbageReportInput): GarbageScanR
     summary: { total: items.length, size, byType },
     checks,
     skipped: checks.filter((c) => !c.ran).length,
+    ...(input.nestedProject ? { nestedProject: input.nestedProject } : {}),
     timestamp: now().toISOString(),
   };
 }

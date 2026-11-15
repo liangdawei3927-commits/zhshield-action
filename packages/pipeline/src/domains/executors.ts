@@ -12,6 +12,7 @@ import type { RuleEngineReport } from '@zh/kernel';
 import type { RefactorReport } from '@zh/refactor';
 import type { DomainExecutionContext, DomainExecution, DomainExecutor } from './types';
 import { loadGuardConclusions } from '../domain-snapshot';
+import { detectNestedProjectSuggestion } from '../project-profile';
 import { scanDeps } from './deps-scan';
 import type { SecurityVulnerabilityFinding } from './security-sop';
 
@@ -261,11 +262,14 @@ export async function runGarbageDomain(ctx: DomainExecutionContext): Promise<Dom
     }
   }
 
+  // 目标本身没有可检测代码时，附一条「唯一子项目」建议（只提示，扫描根不变）
+  const nestedProject = detectNestedProjectSuggestion(ctx.repoRoot);
   const report = buildGarbageReport({
     projectPath: ctx.repoRoot,
     fsItems,
     evaluations: evaluations as Parameters<typeof buildGarbageReport>[0]['evaluations'],
     ruleChannelRan,
+    ...(nestedProject ? { nestedProject } : {}),
   });
   return {
     report,

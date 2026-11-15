@@ -339,6 +339,11 @@ export interface GarbageScanReportData {
   }>;
   /** 未真正执行的检测项数 */
   skipped: number;
+  /**
+   * 检测到的唯一子项目（目标本身没有可检测代码时给出）。
+   * 只是建议：页面提示「是否改扫它」，由用户点按钮才换目标，绝不静默改判。
+   */
+  nestedProject?: { path: string; name: string };
   timestamp: string;
 }
 

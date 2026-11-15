@@ -165,3 +165,24 @@ describe('规则映射表', () => {
     expect(items[0].path).toBe('a.ts');
   });
 });
+
+/** 子项目建议：报告只是带一条提示，扫描根（projectPath）绝不因此改变 */
+describe('buildGarbageReport — nestedProject 建议', () => {
+  it('传入时原样带出，projectPath 仍是调用方给的目标', () => {
+    const report = buildGarbageReport({
+      projectPath: '/outer',
+      fsItems: [],
+      evaluations: [],
+      ruleChannelRan: false,
+      nestedProject: { path: '/outer/inner', name: 'inner' },
+    });
+
+    expect(report.projectPath).toBe('/outer');
+    expect(report.nestedProject).toEqual({ path: '/outer/inner', name: 'inner' });
+  });
+
+  it('未传入时不带该字段（旧报告形状不变）', () => {
+    const report = buildGarbageReport({ projectPath: '/p', fsItems: [], evaluations: [] });
+    expect(report.nestedProject).toBeUndefined();
+  });
+});

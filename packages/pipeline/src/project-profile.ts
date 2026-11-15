@@ -190,6 +190,28 @@ export function resolveEffectiveProjectRoot(projectPath: string): string {
   return candidates.length === 1 ? candidates[0] : root;
 }
 
+/**
+ * 检测「唯一子项目」建议（**只提示，不改判**）。
+ *
+ * 与 {@link resolveEffectiveProjectRoot} 的区别是语义边界：那个函数是"扫描根到底是谁"，
+ * 因此目标带 `.git` 一律不下探（2026-11-09 事故）；本函数只回答"要不要问用户一句"，
+ * 不参与任何路径解析 —— 调用方拿到的建议必须经用户确认才会被使用。
+ *
+ * 返回 null 的情形：目标自身有清单（它自己就是项目根）／候选不是恰好一个。
+ *
+ * @returns 唯一子项目根与目录名；不足以给出建议时返回 null
+ */
+export function detectNestedProjectSuggestion(
+  projectPath: string,
+): { path: string; name: string } | null {
+  const root = path.resolve(projectPath);
+  if (fs.existsSync(path.join(root, 'package.json'))) return null;
+  if (hasPythonManifest(root)) return null;
+  const candidates = listNestedProjectRootCandidates(root);
+  if (candidates.length !== 1) return null;
+  return { path: candidates[0], name: path.basename(candidates[0]) };
+}
+
 /** 列出一层子目录中含合法 package.json 的候选项目根（跳过点开头与噪声目录） */
 function listNestedProjectRootCandidates(root: string): string[] {
   let entries: fs.Dirent[];

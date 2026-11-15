@@ -68,5 +68,12 @@ export interface GarbageScanReport {
   checks: GarbageCheckStatus[];
   /** 未真正执行的检测数 */
   skipped: number;
+  /**
+   * 检测到的唯一子项目（目标本身没有可检测代码时给出）。
+   *
+   * **只是建议，不是改判**：扫描根仍是调用方传入的项目，页面据此提示「是否改扫它」，
+   * 由用户点按钮才换目标。禁止任何消费方据此静默改变扫描对象（2026-11-09 事故）。
+   */
+  nestedProject?: { path: string; name: string };
   timestamp: string;
 }

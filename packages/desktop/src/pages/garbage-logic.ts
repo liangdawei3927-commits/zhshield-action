@@ -1,6 +1,11 @@
 import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
 import { t } from '@zh/i18n';
 import { runGarbageScan, cleanGarbage, restoreGarbage } from '../services/engineApi';
+import {
+  useGarbageScanActions,
+  useGarbageScanTarget,
+  type GarbageScanTarget,
+} from './garbage-scan-target';
 import type {
   GarbageScanReportData,
   GarbageCleanResultData,
@@ -309,6 +314,8 @@ async function refreshGarbageReport(
   }
 }
 
+export type { GarbageScanTarget } from './garbage-scan-target';
+
 /** 垃圾清理页：走垃圾清理域自有通道（文件系统检测器 + garbage 域 SOP 规则），不再借调安全引擎 */
 export function useGarbagePage(projectPath: string): DomainRunState & {
   report: GarbageScanReportData | null;
@@ -323,14 +330,26 @@ export function useGarbagePage(projectPath: string): DomainRunState & {
   handleClean: () => Promise<void>;
   handleRestore: () => Promise<void>;
   copyAllToAi: (items: GarbageScanReportData['items']) => void;
+  /** 当前扫描对象（null = 页面所属项目本身） */
+  scanTarget: GarbageScanTarget | null;
+  /** 报告给出的唯一子项目建议（切到子项目后保留，便于切回） */
+  nestedSuggestion: GarbageScanTarget | null;
+  /** 换扫描对象并立刻重扫（target=null 表示回到页面所属项目） */
+  switchScanTarget: (target: GarbageScanTarget | null) => Promise<void>;
 } {
   const [report, setReport] = useState<GarbageScanReportData | null>(null);
   const runState = useDomainRunState('garbage', projectPath);
   const { selected, toggleSelect, toggleAll, clearSelection } = useGarbageSelection(report);
-  const refreshReport = useCallback(
-    () => refreshGarbageReport(projectPath, setReport, clearSelection),
-    [projectPath, clearSelection],
+  // 真实扫描函数（含取消语义）由此注入给扫描对象/动作两个 hook，保持它们与引擎解耦
+  const scan = useCallback(
+    (targetPath: string) => refreshGarbageReport(targetPath, setReport, clearSelection),
+    [setReport, clearSelection],
   );
+  const { scanTarget, setScanTarget, nestedSuggestion, refreshReport } = useGarbageScanTarget({
+    projectPath,
+    report,
+    scan,
+  });
   const {
     cleaning,
     restoring,
@@ -347,13 +366,13 @@ export function useGarbagePage(projectPath: string): DomainRunState & {
     onSelectionCleared: clearSelection,
     onRefresh: refreshReport,
   });
-  const handleScan = useCallback(
-    async (keepBanner = false) => {
-      clearResults(!keepBanner);
-      await refreshReport();
-    },
-    [refreshReport, clearResults],
-  );
+  const { handleScan, switchScanTarget } = useGarbageScanActions({
+    projectPath,
+    refreshReport,
+    clearResults,
+    setScanTarget,
+    scan,
+  });
   const { copyAllToAi } = useGarbageCopyToAi(projectPath);
 
   return {
@@ -370,5 +389,8 @@ export function useGarbagePage(projectPath: string): DomainRunState & {
     handleClean,
     handleRestore,
     copyAllToAi,
+    scanTarget,
+    nestedSuggestion,
+    switchScanTarget,
   };
 }

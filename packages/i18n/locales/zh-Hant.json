@@ -1191,6 +1191,12 @@
       "selectAll": "全選",
       "selectedCount": "已選 {{count}} 項",
       "skippedNotice": "{{count}} 項檢測未執行，結果可能不完整：",
+      "nestedProject": {
+        "active": "本次掃描對象：{{name}}（子專案），不是頂部顯示的專案",
+        "back": "改回目前專案",
+        "hint": "目前專案沒有可檢測的程式碼（無 package.json / 非 TypeScript 專案）。偵測到子專案 {{name}}，是否改掃它？",
+        "switch": "改掃該子專案"
+      },
       "notDetected": "未檢測",
       "notDetectedHint": "本維度未執行：{{reason}}。未檢測 ≠ 沒有問題，修復工具或重新掃描後可獲得結果。",
       "notDetectedNoProducer": "本域未登記涵蓋該類型的檢測項",

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: 47cfa6d41f0cda3d
+// @zh-src-hash: a0daad4b9934fb73
 // @zh-src-files: 435
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -137516,7 +137516,7 @@ ${lanes.join("\n")}
               return process.memoryUsage().heapUsed;
             },
             getFileSize(path83) {
-              const stat = statSync17(path83);
+              const stat = statSync18(path83);
               if (stat == null ? void 0 : stat.isFile()) {
                 return stat.size;
               }
@@ -137560,7 +137560,7 @@ ${lanes.join("\n")}
             }
           };
           return nodeSystem;
-          function statSync17(path83) {
+          function statSync18(path83) {
             try {
               return _fs.statSync(path83, statSyncOptions);
             } catch {
@@ -137619,7 +137619,7 @@ ${lanes.join("\n")}
               activeSession.post("Profiler.stop", (err, { profile }) => {
                 var _a;
                 if (!err) {
-                  if ((_a = statSync17(profilePath)) == null ? void 0 : _a.isDirectory()) {
+                  if ((_a = statSync18(profilePath)) == null ? void 0 : _a.isDirectory()) {
                     profilePath = _path.join(profilePath, `${(/* @__PURE__ */ new Date()).toISOString().replace(/:/g, "-")}+P${process.pid}.cpuprofile`);
                   }
                   try {
@@ -137739,7 +137739,7 @@ ${lanes.join("\n")}
                 let stat;
                 if (typeof dirent === "string" || dirent.isSymbolicLink()) {
                   const name = combinePaths(path83, entry);
-                  stat = statSync17(name);
+                  stat = statSync18(name);
                   if (!stat) {
                     continue;
                   }
@@ -137763,7 +137763,7 @@ ${lanes.join("\n")}
             return matchFiles(path83, extensions, excludes, includes, useCaseSensitiveFileNames2, process.cwd(), depth, getAccessibleFileSystemEntries, realpath);
           }
           function fileSystemEntryExists(path83, entryKind) {
-            const stat = statSync17(path83);
+            const stat = statSync18(path83);
             if (!stat) {
               return false;
             }
@@ -137805,7 +137805,7 @@ ${lanes.join("\n")}
           }
           function getModifiedTime3(path83) {
             var _a;
-            return (_a = statSync17(path83)) == null ? void 0 : _a.mtime;
+            return (_a = statSync18(path83)) == null ? void 0 : _a.mtime;
           }
           function setModifiedTime(path83, time) {
             try {
@@ -500373,6 +500373,11 @@ var init_scan_walk = __esm({
       ".cache",
       "release",
       ".zhshield",
+      // 本产品自身的构建产物目录（DMG / zip 安装包，实测单目录 666 MB）：
+      // 它不是待检源码，与 semgrep 侧 `DEFAULT_SCAN_EXCLUDE_DIRS` 的排除口径对齐。
+      // 2026-11-15 实测：漏掉此项时 injection-guard 会把 3 个 .dmg + 3 个 .zip 整份
+      // 按 UTF-8 解码，单次 walk 从 ~20s 膨胀到 210s，吃满安全域 300s 预算。
+      "build-output",
       "__tests__",
       "fixtures",
       "__fixtures__",
@@ -502081,7 +502086,7 @@ function scanMarkdownHiddenLinks(content) {
 function isEnvFile(fileName) {
   return ENV_FILE_NAMES.has(fileName);
 }
-var import_node_crypto21, fs56, path60, MARKDOWN_EXT, ENV_FILE_NAMES, LINE_COMMENT_PREFIX, BLOCK_COMMENT_DELIMS, INSTRUCTION_PATTERNS, SCRIPT_SUSPICIOUS_PATTERNS, SAFE_RM_RF_TARGET, COMMAND_SEGMENT_SPLIT_RE, TOKEN_SPLIT_RE, HIDDEN_STYLE_PATTERN, ANCHOR_TAG_PATTERN, MD_LINK_TARGET_PATTERN, ZERO_WIDTH_PATTERN, InjectionGuard;
+var import_node_crypto21, fs56, path60, MARKDOWN_EXT, ENV_FILE_NAMES, LINE_COMMENT_PREFIX, BLOCK_COMMENT_DELIMS, CONTENT_SCANNED_EXTS, MAX_CONTENT_FILE_BYTES, INSTRUCTION_PATTERNS, SCRIPT_SUSPICIOUS_PATTERNS, SAFE_RM_RF_TARGET, COMMAND_SEGMENT_SPLIT_RE, TOKEN_SPLIT_RE, HIDDEN_STYLE_PATTERN, ANCHOR_TAG_PATTERN, MD_LINK_TARGET_PATTERN, ZERO_WIDTH_PATTERN, InjectionGuard;
 var init_injection_guard = __esm({
   "../security/src/injection-guard.ts"() {
     "use strict";
@@ -502115,6 +502120,12 @@ var init_injection_guard = __esm({
       [".cjs", ["/*", "*/"]],
       [".md", ["<!--", "-->"]]
     ]);
+    CONTENT_SCANNED_EXTS = /* @__PURE__ */ new Set([
+      MARKDOWN_EXT,
+      ...LINE_COMMENT_PREFIX.keys(),
+      ...BLOCK_COMMENT_DELIMS.keys()
+    ]);
+    MAX_CONTENT_FILE_BYTES = 1048576;
     INSTRUCTION_PATTERNS = [
       ["ignore-previous-instructions", /ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?/i],
       ["disregard-rules", /disregard\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|rules)/i],
@@ -502159,14 +502170,16 @@ var init_injection_guard = __esm({
           );
           return;
         }
+        const ext = path60.extname(fileName).toLowerCase();
+        const isPackageJson = fileName === PACKAGE_JSON_FILE;
+        if (!isPackageJson && !CONTENT_SCANNED_EXTS.has(ext)) return;
         const content = this.readFileContent(filePath);
         if (content === null) return;
         const relFile = path60.relative(projectPath, filePath);
-        if (fileName === PACKAGE_JSON_FILE) {
+        if (isPackageJson) {
           this.scanPackageJsonScripts(filePath, content, items);
           return;
         }
-        const ext = path60.extname(fileName).toLowerCase();
         if (ext === MARKDOWN_EXT) {
           this.scanMarkdownFile(filePath, relFile, content, items);
         }
@@ -502176,6 +502189,7 @@ var init_injection_guard = __esm({
       }
       readFileContent(filePath) {
         try {
+          if (fs56.statSync(filePath).size > MAX_CONTENT_FILE_BYTES) return null;
           return fs56.readFileSync(filePath, "utf-8");
         } catch {
           return null;

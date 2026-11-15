@@ -33,6 +33,30 @@ const BLOCK_COMMENT_DELIMS = new Map<string, readonly [string, string]>([
   ['.md', ['<!--', '-->']],
 ]);
 
+/**
+ * 需要读取内容才有检测项的扩展名集合。
+ *
+ * 由三类检测共同决定：markdown 隐藏链接、注释内容扫描、以及 package.json 脚本判定
+ * （后者按文件名匹配，单独判断）。**其余扩展名读完没有任何后续动作** —— 旧实现
+ * 先无条件 `readFileSync(filePath, 'utf-8')` 再按扩展名分支，等于把 .dmg / .zip / .png /
+ * .db 也整份解码成 JS 字符串。
+ *
+ * 2026-11-15 实测（桌面端扫描 `Desktop/ZHCodeShield`，300mm 级项目）：一次 walk 读
+ * 2176 个文件 / 682 MB，其中 `.dmg` 3 个 514 MB、`.zip` 3 个 152 MB；真正会被检测的
+ * 源码/文档合计仅约 11 MB。安全域里该 walk 一次扫描跑 3 遍（SecurityEngine 聚合器 +
+ * 2 条 SOP `security-check` 规则经 SecurityCheckEngine），CPU profile 分别为 17.5s /
+ * 34.1s / 210.4s（越跑越慢：666 MB 二进制解码出的字符串堆叠未回收），合计 262s，
+ * 把 `SCAN_DOMAIN_BUDGETS.security` 的 300s 预算吃满 → 域恒 `unavailable`。
+ */
+const CONTENT_SCANNED_EXTS: ReadonlySet<string> = new Set([
+  MARKDOWN_EXT,
+  ...LINE_COMMENT_PREFIX.keys(),
+  ...BLOCK_COMMENT_DELIMS.keys(),
+]);
+
+/** 单文件读取上限（1 MB）：与 kernel `readFileSafe` 同口径，超大文件skip，避免撑爆堆 */
+const MAX_CONTENT_FILE_BYTES = 1_048_576;
+
 const INSTRUCTION_PATTERNS: ReadonlyArray<readonly [string, RegExp]> = [
   ['ignore-previous-instructions', /ignore\s+(?:all\s+)?(?:previous|prior|above)\s+instructions?/i],
   ['disregard-rules', /disregard\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions?|rules)/i],
@@ -258,16 +282,20 @@ export class InjectionGuard {
       return;
     }
 
+    // 先按扩展名筛、再读内容（顺序颠倒是 2026-11-15 的生产事故成因，见 CONTENT_SCANNED_EXTS）
+    const ext = path.extname(fileName).toLowerCase();
+    const isPackageJson = fileName === PACKAGE_JSON_FILE;
+    if (!isPackageJson && !CONTENT_SCANNED_EXTS.has(ext)) return;
+
     const content = this.readFileContent(filePath);
     if (content === null) return;
     const relFile = path.relative(projectPath, filePath);
 
-    if (fileName === PACKAGE_JSON_FILE) {
+    if (isPackageJson) {
       this.scanPackageJsonScripts(filePath, content, items);
       return;
     }
 
-    const ext = path.extname(fileName).toLowerCase();
     if (ext === MARKDOWN_EXT) {
       this.scanMarkdownFile(filePath, relFile, content, items);
     }
@@ -278,6 +306,9 @@ export class InjectionGuard {
 
   private readFileContent(filePath: string): string | null {
     try {
+      // 大小闸门与扩展名白名单是两道独立防线：将来若有人把大文件改名成 .md/.js，
+      // 也不会再把整份内容读进堆里（同口径见 kernel `readFileSafe` 的 1 MB 上限）
+      if (fs.statSync(filePath).size > MAX_CONTENT_FILE_BYTES) return null;
       return fs.readFileSync(filePath, 'utf-8');
     } catch {
       return null;

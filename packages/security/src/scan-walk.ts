@@ -19,6 +19,11 @@ export const SKIP_DIRS: ReadonlySet<string> = new Set([
   '.cache',
   'release',
   '.zhshield',
+  // 本产品自身的构建产物目录（DMG / zip 安装包，实测单目录 666 MB）：
+  // 它不是待检源码，与 semgrep 侧 `DEFAULT_SCAN_EXCLUDE_DIRS` 的排除口径对齐。
+  // 2026-11-15 实测：漏掉此项时 injection-guard 会把 3 个 .dmg + 3 个 .zip 整份
+  // 按 UTF-8 解码，单次 walk 从 ~20s 膨胀到 210s，吃满安全域 300s 预算。
+  'build-output',
   '__tests__',
   'fixtures',
   '__fixtures__',

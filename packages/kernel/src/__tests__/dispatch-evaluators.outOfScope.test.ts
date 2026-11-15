@@ -63,4 +63,28 @@ describe('SopRuleEngine — out-of-scope 不算降级（R7）', () => {
     expect(evaluation.degraded).toBeUndefined();
     expect(report.degraded ?? 0).toBe(0);
   });
+
+  /**
+   * 文案口径（2026-11-15 实测）：垃圾页横幅把「目标目录无 package.json」渲染成
+   * 「工具 depcheck 错误: …」，读起来像工具故障 —— 而同一份结果在 kernel 里明确
+   * 判为「既定裁剪」。本用例锁住：范围外的文案必须说「不适用」，不得出现「错误」。
+   */
+  it('garbage 域：out-of-scope 的文案是「不适用」而非「错误」', async () => {
+    registry.register(
+      makeRule({
+        id: 'garbage.scan.cleanup.unused-dependency',
+        domain: 'garbage',
+        applicableEngines: ['inspect'],
+        content: { check: { tool: 'depcheck', toolConfig: {} } },
+      }),
+    );
+
+    const report = await engine.evaluateRules({ repoRoot: '/tmp', domain: 'garbage' });
+    const evaluation = report.evaluations[0];
+
+    expect(evaluation.status).toBe('skipped');
+    expect(evaluation.degraded).toBeUndefined();
+    expect(evaluation.message).toContain('不适用于当前项目');
+    expect(evaluation.message).not.toContain('错误');
+  });
 });

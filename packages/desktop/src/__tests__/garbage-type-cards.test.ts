@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GarbageScanReportData } from '../types/electron';
-import { garbageTypeStates, isGarbageTypeUndetected } from '../pages/garbage-type-logic';
+import {
+  garbageCheckCoverage,
+  garbageTypeStates,
+  isGarbageTypeUndetected,
+} from '../pages/garbage-type-logic';
 
 /**
  * 「未检测 ≠ 0」回归（垃圾清理类型卡）。
@@ -72,5 +76,36 @@ describe('isGarbageTypeUndetected', () => {
       reportOf([{ ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector' }]),
     );
     expect(isGarbageTypeUndetected(states, 'duplicate-code', false)).toBe(false);
+  });
+});
+
+/**
+ * 「有检测没跑成时不得显示等级」回归（C4）。
+ *
+ * 实测（2026-11-15，文档仓库）：三项检测只跑了文件系统检测器，条目 0、罚分 0，
+ * 顶行照样显示「100 分 · 优秀」——而三张类型卡同时写着「未检测」。覆盖必须交给
+ * 评分卡，分数才会改口成「已检测部分均分」。安全页早已这样接线，垃圾页漏了。
+ */
+describe('garbageCheckCoverage', () => {
+  const partialReport = reportOf([
+    { ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector', garbageTypes: ['unused-file', 'build-artifact'] },
+    { ruleId: 'garbage.scan.cleanup.dead-code', name: '死代码检测', ran: false, producer: 'sop-rule', reason: '本项目不适用该工具（ts-prune），已跳过', garbageTypes: ['dead-code'] },
+    { ruleId: 'garbage.scan.cleanup.unused-dependency', name: '未使用依赖检测', ran: false, producer: 'sop-rule', reason: '目标目录无 package.json', garbageTypes: ['unused-dependency'] },
+  ]);
+
+  it('三项只跑了一项 → {run:1,total:3}，评分卡据此判 partial', () => {
+    expect(garbageCheckCoverage(partialReport)).toEqual({ run: 1, total: 3 });
+  });
+
+  it('全部执行 → run 等于 total（评分卡保留等级）', () => {
+    const complete = reportOf([
+      { ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector', garbageTypes: ['unused-file', 'build-artifact'] },
+      { ruleId: 'garbage.scan.cleanup.dead-code', name: '死代码检测', ran: true, producer: 'sop-rule', garbageTypes: ['dead-code'] },
+    ]);
+    expect(garbageCheckCoverage(complete)).toEqual({ run: 2, total: 2 });
+  });
+
+  it('无 checks（历史快照等旧报告）→ undefined，退回旧口径而不是误判 partial', () => {
+    expect(garbageCheckCoverage(reportOf([]))).toBeUndefined();
   });
 });

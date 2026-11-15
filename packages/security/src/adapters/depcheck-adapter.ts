@@ -44,8 +44,8 @@ export class DepcheckAdapter implements ToolAdapter {
           timestamp: new Date(),
           fileCount: 0,
         },
-        error:
-          '扫描根目录无 package.json，未使用依赖检测范围外未执行（如需检测请在含 Node 清单的项目根运行）',
+        // 同上：只写前提与补救方向，「范围外未执行」的措辞交给 kernel 统一拼装
+        error: '扫描根目录无 package.json（如需检测请在含 Node 清单的项目根运行）',
       };
     }
 

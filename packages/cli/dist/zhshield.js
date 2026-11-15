@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: a0daad4b9934fb73
+// @zh-src-hash: a9d9d940866efb8e
 // @zh-src-files: 435
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -5754,6 +5754,7 @@ var init_zh_Hans = __esm({
             title: "\u6E05\u7406\u9879\u76EE\u5783\u573E"
           },
           emptyList: "\u9879\u76EE\u5F88\u5E72\u51C0\uFF0C\u6CA1\u6709\u53EF\u6E05\u7406\u7684\u5783\u573E",
+          emptyListPartial: "\u5DF2\u6267\u884C\u7684\u68C0\u6D4B\u672A\u53D1\u73B0\u53EF\u6E05\u7406\u7684\u5783\u573E\uFF08\u53E6\u6709 {{count}} \u9879\u68C0\u6D4B\u672A\u6267\u884C\uFF09",
           feature: {
             deadCode: {
               desc: "\u68C0\u6D4B\u65E0\u6CD5\u5230\u8FBE\u7684\u4EE3\u7801\u5206\u652F"
@@ -8082,6 +8083,7 @@ var init_zh_Hant = __esm({
             title: "\u6E05\u7406\u5C08\u6848\u5783\u573E"
           },
           emptyList: "\u5C08\u6848\u5F88\u4E7E\u6DE8\uFF0C\u6C92\u6709\u53EF\u6E05\u7406\u7684\u5783\u573E",
+          emptyListPartial: "\u5DF2\u57F7\u884C\u7684\u6AA2\u6E2C\u672A\u767C\u73FE\u53EF\u6E05\u7406\u7684\u5783\u573E\uFF08\u53E6\u6709 {{count}} \u9805\u6AA2\u6E2C\u672A\u57F7\u884C\uFF09",
           feature: {
             deadCode: {
               desc: "\u6AA2\u6E2C\u7121\u6CD5\u5230\u9054\u7684\u7A0B\u5F0F\u78BC\u5206\u652F"
@@ -501760,7 +501762,8 @@ var init_depcheck_adapter = __esm({
               timestamp: /* @__PURE__ */ new Date(),
               fileCount: 0
             },
-            error: "\u626B\u63CF\u6839\u76EE\u5F55\u65E0 package.json\uFF0C\u672A\u4F7F\u7528\u4F9D\u8D56\u68C0\u6D4B\u8303\u56F4\u5916\u672A\u6267\u884C\uFF08\u5982\u9700\u68C0\u6D4B\u8BF7\u5728\u542B Node \u6E05\u5355\u7684\u9879\u76EE\u6839\u8FD0\u884C\uFF09"
+            // 同上：只写前提与补救方向，「范围外未执行」的措辞交给 kernel 统一拼装
+            error: "\u626B\u63CF\u6839\u76EE\u5F55\u65E0 package.json\uFF08\u5982\u9700\u68C0\u6D4B\u8BF7\u5728\u542B Node \u6E05\u5355\u7684\u9879\u76EE\u6839\u8FD0\u884C\uFF09"
           };
         }
         try {
@@ -511055,7 +511058,8 @@ function resolveToolAdapter(host, rule, instr) {
       kind: "skipped",
       result: skipEvaluation(
         rule,
-        `\u5DE5\u5177 ${instr.tool} \u4E0D\u5728\u5F53\u524D\u9879\u76EE\u753B\u50CF scope \u5185\uFF0Ctool-dispatch \u8DF3\u8FC7`,
+        // 面向用户的文案：不暴露 tool-dispatch / scope 这类实现术语（它们会原样进页面横幅）
+        `\u672C\u9879\u76EE\u4E0D\u9002\u7528\u8BE5\u5DE5\u5177\uFF08${instr.tool}\uFF09\uFF0C\u5DF2\u8DF3\u8FC7`,
         targetEngineOf(rule)
       )
     };
@@ -511156,7 +511160,11 @@ function buildToolScanResult(rule, instr, result) {
     status,
     violations,
     files: violations.length > 0 ? [...new Set(violations.map((v) => v.file))] : void 0,
-    message: violations.length > 0 ? `\u5DE5\u5177 ${instr.tool} \u53D1\u73B0 ${violations.length} \u4E2A\u95EE\u9898` : result.error ? `\u5DE5\u5177 ${instr.tool} \u9519\u8BEF: ${result.error}` : `\u5DE5\u5177 ${instr.tool} \u68C0\u67E5\u901A\u8FC7`,
+    message: violations.length > 0 ? `\u5DE5\u5177 ${instr.tool} \u53D1\u73B0 ${violations.length} \u4E2A\u95EE\u9898` : result.error ? (
+      // 范围外不是「工具坏了」：文案必须跟着 degraded 的判定走（见上方 outOfScope 说明），
+      // 否则页面上「既定裁剪」被读成「工具故障」，给出错误的恢复指引（R7 实测）。
+      outOfScope ? `\u5DE5\u5177 ${instr.tool} \u4E0D\u9002\u7528\u4E8E\u5F53\u524D\u9879\u76EE: ${result.error}` : `\u5DE5\u5177 ${instr.tool} \u9519\u8BEF: ${result.error}`
+    ) : `\u5DE5\u5177 ${instr.tool} \u68C0\u67E5\u901A\u8FC7`,
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),
     timestamp: /* @__PURE__ */ new Date(),
@@ -518639,7 +518647,9 @@ var DepcheckAdapter = class extends ToolCommandAdapter {
           // R7：无 package.json 是**既定裁剪**（项目前提不满足），不是工具故障。
           // 与 trivy 侧口径一致标 out-of-scope，kernel 据此落 skipped 且不置 degraded。
           skipReason: "out-of-scope",
-          error: `\u76EE\u6807\u76EE\u5F55\u65E0 package.json\uFF08${projectPath}\uFF09\uFF0C\u8DF3\u8FC7\u672A\u4F7F\u7528\u4F9D\u8D56\u68C0\u6D4B`
+          // 只描述「前提不满足」这一事实：跳过语义与「不适用」措辞由 kernel 统一拼装，
+          // 这里再写一遍「跳过未使用依赖检测」会和规则名重复。
+          error: `\u76EE\u6807\u76EE\u5F55\u65E0 package.json\uFF08${projectPath}\uFF09`
         })
       };
     }

@@ -47,3 +47,21 @@ export function isGarbageTypeUndetected(
   if (states.reasons.has(type)) return true;
   return hasDeclaredTypes && !states.covered.has(type);
 }
+
+/**
+ * 本次垃圾扫描的检测项覆盖（run / total），交给评分卡决定分数该怎么称呼。
+ *
+ * 存在意义：垃圾维的分数只由 `{total, byType}` 算出 —— 扫文档仓时三类检测没跑、
+ * 条目为 0、罚分为 0，页面照样显示「100 分 · 优秀」。而 DomainScoreCard 的 C4 契约
+ * 要求「有检测没跑成时，分数只能叫『已检测部分均分』，不显示等级」。安全页早就把
+ * ruleLedger 换算成覆盖传下去了（security-report-parts.tsx），垃圾页漏了这一步。
+ *
+ * @returns 无 checks（历史快照等旧报告）→ undefined，评分卡退回旧口径，不误标
+ */
+export function garbageCheckCoverage(
+  report: GarbageScanReportData,
+): { run: number; total: number } | undefined {
+  const checks = report.checks ?? [];
+  if (checks.length === 0) return undefined;
+  return { run: checks.filter((c) => c.ran).length, total: checks.length };
+}

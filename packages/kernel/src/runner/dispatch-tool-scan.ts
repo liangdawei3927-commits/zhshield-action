@@ -134,7 +134,8 @@ function resolveToolAdapter(
       kind: 'skipped',
       result: skipEvaluation(
         rule,
-        `工具 ${instr.tool} 不在当前项目画像 scope 内，tool-dispatch 跳过`,
+        // 面向用户的文案：不暴露 tool-dispatch / scope 这类实现术语（它们会原样进页面横幅）
+        `本项目不适用该工具（${instr.tool}），已跳过`,
         targetEngineOf(rule),
       ),
     };
@@ -324,7 +325,11 @@ function buildToolScanResult(
       violations.length > 0
         ? `工具 ${instr.tool} 发现 ${violations.length} 个问题`
         : result.error
-          ? `工具 ${instr.tool} 错误: ${result.error}`
+          ? // 范围外不是「工具坏了」：文案必须跟着 degraded 的判定走（见上方 outOfScope 说明），
+            // 否则页面上「既定裁剪」被读成「工具故障」，给出错误的恢复指引（R7 实测）。
+            outOfScope
+            ? `工具 ${instr.tool} 不适用于当前项目: ${result.error}`
+            : `工具 ${instr.tool} 错误: ${result.error}`
           : `工具 ${instr.tool} 检查通过`,
     durationMs: result.metadata.duration,
     targetEngine: targetEngineOf(rule),

@@ -50,7 +50,7 @@ describe('SopRuleEngine — R3d tool-dispatch 画像 scope 裁剪（dispatch-eva
     );
   });
 
-  it('① toolScope 未命中（画像 language=go，eslint 不在 scope）→ 指令 skipped + reason 含「不在当前项目画像 scope」', async () => {
+  it('① toolScope 未命中（画像 language=go，eslint 不在 scope）→ 指令 skipped + reason 为「不适用」人话文案', async () => {
     const report = await engine.evaluateRules({
       repoRoot: '/tmp',
       domain: 'guard',
@@ -59,7 +59,10 @@ describe('SopRuleEngine — R3d tool-dispatch 画像 scope 裁剪（dispatch-eva
 
     const evalResult = report.evaluations[0];
     expect(evalResult.status).toBe('skipped');
-    expect(evalResult.message).toContain('不在当前项目画像 scope');
+    // 文案会原样进页面横幅，不得泄漏 tool-dispatch / scope 这类实现术语
+    expect(evalResult.message).toBe('本项目不适用该工具（eslint），已跳过');
+    expect(evalResult.message).not.toContain('tool-dispatch');
+    expect(evalResult.message).not.toContain('scope');
     expect(report.skipped).toBe(1);
   });
 

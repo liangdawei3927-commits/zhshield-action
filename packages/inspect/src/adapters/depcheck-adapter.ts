@@ -96,7 +96,9 @@ export class DepcheckAdapter extends ToolCommandAdapter {
           // R7：无 package.json 是**既定裁剪**（项目前提不满足），不是工具故障。
           // 与 trivy 侧口径一致标 out-of-scope，kernel 据此落 skipped 且不置 degraded。
           skipReason: 'out-of-scope',
-          error: `目标目录无 package.json（${projectPath}），跳过未使用依赖检测`,
+          // 只描述「前提不满足」这一事实：跳过语义与「不适用」措辞由 kernel 统一拼装，
+          // 这里再写一遍「跳过未使用依赖检测」会和规则名重复。
+          error: `目标目录无 package.json（${projectPath}）`,
         }),
       };
     }

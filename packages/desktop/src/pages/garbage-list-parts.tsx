@@ -24,6 +24,13 @@ interface GarbageListProps {
   items: GarbageScanReportData['items'];
   selected: Set<string>;
   onToggle: (id: string) => void;
+  /**
+   * 本次未执行的检测项数。
+   *
+   * 清单为空时不能再直说「项目很干净」—— 扫文档仓时三类检测压根没跑，
+   * 「没查」与「查过且干净」在页面上必须分开说（与类型卡的「未检测」同一口径）。
+   */
+  undetectedCount?: number;
 }
 
 function GarbageCard({
@@ -63,8 +70,18 @@ function GarbageCard({
   );
 }
 
-export function GarbageList({ items, selected, onToggle }: GarbageListProps) {
+export function GarbageList({
+  items,
+  selected,
+  onToggle,
+  undetectedCount = 0,
+}: GarbageListProps) {
   const t = useT();
+  // 空清单有两种含义：检测全跑了（真干净）／有检测没跑（只是没查）。后者必须说清楚
+  const emptyText =
+    undetectedCount > 0
+      ? t('page.garbage.emptyListPartial', { count: undetectedCount })
+      : t('page.garbage.emptyList');
   return (
     <div className="space-y-3">
       {items.map((item) => (
@@ -78,8 +95,10 @@ export function GarbageList({ items, selected, onToggle }: GarbageListProps) {
       {items.length === 0 && (
         <div className="rounded-xl flex flex-col items-center justify-center py-16 gap-2 bg-zh-panel border border-dashed border-zh-line">
           <span className="text-2xl">🧹</span>
-          <span className="text-sm font-medium text-success-700">
-            {t('page.garbage.emptyList')}
+          <span
+            className={`text-sm font-medium ${undetectedCount > 0 ? 'text-warning-700' : 'text-success-700'}`}
+          >
+            {emptyText}
           </span>
         </div>
       )}

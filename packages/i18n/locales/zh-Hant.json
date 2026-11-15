@@ -1164,6 +1164,7 @@
         "title": "清理專案垃圾"
       },
       "emptyList": "專案很乾淨，沒有可清理的垃圾",
+      "emptyListPartial": "已執行的檢測未發現可清理的垃圾（另有 {{count}} 項檢測未執行）",
       "feature": {
         "deadCode": {
           "desc": "檢測無法到達的程式碼分支"

@@ -10,7 +10,11 @@ import { NavGlyph } from '../components/business/page-glyph';
 import { CopyAllToAiButton } from '../components/ui/CopyAllToAiButton';
 import { useGarbagePage } from './garbage-logic';
 import { GarbageEmptyState } from './garbage-empty-state';
-import { garbageTypeStates, isGarbageTypeUndetected } from './garbage-type-logic';
+import {
+  garbageCheckCoverage,
+  garbageTypeStates,
+  isGarbageTypeUndetected,
+} from './garbage-type-logic';
 import {
   GARBAGE_TYPE_LABEL,
   formatSize,
@@ -161,12 +165,15 @@ function GarbageReportView({
   t,
 }: GarbageReportViewProps) {
   const typeCards = buildGarbageTypeCards({ report, selected, t, copyAllToAi, toggleSelect });
+  // R6/C4：把本次检测项覆盖交给评分卡——有检测没跑成时不得显示等级（与安全页同一口径）
+  const coverage = garbageCheckCoverage(report);
 
   return (
     <DomainReportShell
       projectPath={projectPath}
       domain="garbage"
       refreshKey={report}
+      coverage={coverage}
       title={t('page.garbage.done')}
       actionLabel={t('page.garbage.rescan')}
       onAction={onRescan}
@@ -190,7 +197,12 @@ function GarbageReportView({
         onCopyAllToAi={() => copyAllToAi(report.items)}
         cleaning={cleaning}
       />
-      <GarbageList items={report.items} selected={selected} onToggle={toggleSelect} />
+      <GarbageList
+        items={report.items}
+        selected={selected}
+        onToggle={toggleSelect}
+        undetectedCount={report.skipped}
+      />
     </DomainReportShell>
   );
 }

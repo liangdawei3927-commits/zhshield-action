@@ -320,7 +320,10 @@ export const CAPABILITY_REGISTRY: readonly CapabilityDeclaration[] = [
     id: 'refactor.duplicate-code',
     domain: 'refactor',
     label: '重复代码',
-    summary: 'jscpd 定位可合并的重复实现',
+    // 原写「jscpd 定位可合并的重复实现」：实测重构域用的是自有检测器
+    // （ast-helper-duplicate 跨文件归一化块比对），packages/refactor 全库无 jscpd；
+    // jscpd 适配器只在体检域，且按《07》O1 那里只读重复率指标、不列 issue。
+    summary: '跨文件重复块比对定位可合并的重复实现',
     status: 'implemented',
     implementedBy: ['duplicated-code'],
   },

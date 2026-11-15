@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @zh-src-hash: a9d9d940866efb8e
+// @zh-src-hash: 992c4449a1ca23c4
 // @zh-src-files: 435
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
@@ -352,7 +352,10 @@ var init_capability_registry = __esm({
         id: "refactor.duplicate-code",
         domain: "refactor",
         label: "\u91CD\u590D\u4EE3\u7801",
-        summary: "jscpd \u5B9A\u4F4D\u53EF\u5408\u5E76\u7684\u91CD\u590D\u5B9E\u73B0",
+        // 原写「jscpd 定位可合并的重复实现」：实测重构域用的是自有检测器
+        // （ast-helper-duplicate 跨文件归一化块比对），packages/refactor 全库无 jscpd；
+        // jscpd 适配器只在体检域，且按《07》O1 那里只读重复率指标、不列 issue。
+        summary: "\u8DE8\u6587\u4EF6\u91CD\u590D\u5757\u6BD4\u5BF9\u5B9A\u4F4D\u53EF\u5408\u5E76\u7684\u91CD\u590D\u5B9E\u73B0",
         status: "implemented",
         implementedBy: ["duplicated-code"]
       },

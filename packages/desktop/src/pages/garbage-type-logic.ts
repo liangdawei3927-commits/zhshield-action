@@ -48,6 +48,27 @@ export function isGarbageTypeUndetected(
   return hasDeclaredTypes && !states.covered.has(type);
 }
 
+/** 本域确实产出、值得单独占一张卡的类型（不含已移交重构域的重复代码） */
+const LIVE_GARBAGE_TYPES = ['unused-dependency', 'unused-file', 'dead-code'] as const;
+
+/**
+ * 垃圾页要渲染哪几张类型卡。
+ *
+ * 重复代码按《07》O1 唯一归重构域：本域连规则都不登记，卡片必然恒为「未检测」——
+ * 用户读到的结论是「本域有三个功能坏了」。新报告不该再摆这张空卡；
+ * 旧报告仍要能读出来，故「未声明类型归属」或「条目里确实有 duplicate-code」时保留。
+ *
+ * @param states 由 checks 汇总的类型覆盖
+ * @param byType 条目计数（历史报告可能带 duplicate-code 条目）
+ */
+export function visibleGarbageTypes(
+  states: GarbageTypeStates,
+  byType: Record<string, number>,
+): readonly string[] {
+  const legacyDuplicate = states.covered.size === 0 || (byType['duplicate-code'] ?? 0) > 0;
+  return legacyDuplicate ? [...LIVE_GARBAGE_TYPES, 'duplicate-code'] : [...LIVE_GARBAGE_TYPES];
+}
+
 /**
  * 本次垃圾扫描的检测项覆盖（run / total），交给评分卡决定分数该怎么称呼。
  *

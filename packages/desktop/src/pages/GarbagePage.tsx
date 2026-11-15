@@ -14,6 +14,7 @@ import {
   garbageCheckCoverage,
   garbageTypeStates,
   isGarbageTypeUndetected,
+  visibleGarbageTypes,
 } from './garbage-type-logic';
 import {
   GARBAGE_TYPE_LABEL,
@@ -86,8 +87,8 @@ function buildGarbageTypeCards({
   const states = garbageTypeStates(report);
   // 报告未声明任何类型归属（历史快照等）时退回旧口径，避免把全部维度误标未检测
   const hasDeclaredTypes = states.covered.size > 0;
-  return (['unused-dependency', 'unused-file', 'dead-code', 'duplicate-code'] as const).map(
-    (type) => {
+  // 重复代码已移交重构域：新报告不再摆一张必然「未检测」的空卡（旧报告仍保留）
+  return visibleGarbageTypes(states, report.summary.byType).map((type) => {
       // 未检测 = 检测项跑了但没成功，或本域根本没有覆盖该类型的检测项（如重复代码已移交重构域）
       const undetected = isGarbageTypeUndetected(states, type, hasDeclaredTypes);
       const reasonText =

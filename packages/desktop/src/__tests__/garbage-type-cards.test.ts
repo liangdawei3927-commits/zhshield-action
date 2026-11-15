@@ -4,6 +4,7 @@ import {
   garbageCheckCoverage,
   garbageTypeStates,
   isGarbageTypeUndetected,
+  visibleGarbageTypes,
 } from '../pages/garbage-type-logic';
 
 /**
@@ -86,6 +87,43 @@ describe('isGarbageTypeUndetected', () => {
  * 顶行照样显示「100 分 · 优秀」——而三张类型卡同时写着「未检测」。覆盖必须交给
  * 评分卡，分数才会改口成「已检测部分均分」。安全页早已这样接线，垃圾页漏了。
  */
+/**
+ * 「重复代码卡」清理回归（O1）。
+ *
+ * 重复代码按《07》O1 唯一归重构域，本域连规则都不登记 → 卡片必然恒为「未检测」，
+ * 用户读成「本域有三个功能坏了」。新报告不该再摆这张空卡；旧报告要能读出来。
+ */
+describe('visibleGarbageTypes', () => {
+  it('新报告（已声明类型归属、无 duplicate-code 条目）→ 只渲染本域实际产出的三类', () => {
+    const report = reportOf([
+      { ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector', garbageTypes: ['unused-file', 'build-artifact'] },
+      { ruleId: 'garbage.scan.cleanup.dead-code', name: '死代码检测', ran: false, producer: 'sop-rule', garbageTypes: ['dead-code'] },
+    ]);
+    const types = visibleGarbageTypes(garbageTypeStates(report), report.summary.byType);
+    expect(types).toEqual(['unused-dependency', 'unused-file', 'dead-code']);
+    expect(types).not.toContain('duplicate-code');
+  });
+
+  it('旧报告（未声明类型归属）→ 保留重复代码卡，历史数据仍可读', () => {
+    const report = reportOf([
+      { ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector' },
+    ]);
+    const types = visibleGarbageTypes(garbageTypeStates(report), report.summary.byType);
+    expect(types).toContain('duplicate-code');
+  });
+
+  it('旧报告里确实有 duplicate-code 条目 → 保留该卡', () => {
+    const report = reportOf(
+      [
+        { ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector', garbageTypes: ['unused-file'] },
+      ],
+      { 'duplicate-code': 3 },
+    );
+    const types = visibleGarbageTypes(garbageTypeStates(report), report.summary.byType);
+    expect(types).toContain('duplicate-code');
+  });
+});
+
 describe('garbageCheckCoverage', () => {
   const partialReport = reportOf([
     { ruleId: 'garbage.detect.fs', name: '文件系统级垃圾', ran: true, producer: 'detector', garbageTypes: ['unused-file', 'build-artifact'] },

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// @zh-src-hash: 5f726e9e356bf6ca
-// @zh-src-files: 434
+// @zh-src-hash: 47cfa6d41f0cda3d
+// @zh-src-files: 435
 // 校验：pnpm --filter zhshield-cli verify:dist-fresh（改了 src 必须重建并提交本文件）
 "use strict";
 var __create = Object.create;
@@ -145,16 +145,10 @@ var init_capability_registry = __esm({
     CAPABILITY_REGISTRY = [
       // ─── 性能优化域 ──────────────────────────────────────────────────────────
       {
-        id: "performance.runtime.nested-loop",
-        domain: "performance",
-        label: "\u8FD0\u884C\u65F6\u590D\u6742\u5EA6\uFF08\u5D4C\u5957\u5FAA\u73AF / \u540C\u6B65\u963B\u585E IO\uFF09",
-        status: "implemented",
-        implementedBy: ["performance.runtime.nested-loop", "performance.runtime.sync-io"]
-      },
-      {
         id: "performance.build-config",
         domain: "performance",
-        label: "\u6784\u5EFA\u914D\u7F6E\uFF08\u538B\u7F29 / sourcemap / mode\uFF09",
+        label: "\u6784\u5EFA\u914D\u7F6E",
+        summary: "\u538B\u7F29 / sourcemap / mode \u662F\u5426\u5F00\u542F\u4EA7\u7269\u4F18\u5316",
         status: "implemented",
         implementedBy: ["build-config"]
       },
@@ -162,6 +156,7 @@ var init_capability_registry = __esm({
         id: "performance.bundle-size",
         domain: "performance",
         label: "\u4EA7\u7269\u4F53\u79EF",
+        summary: "\u5355\u6587\u4EF6\u8FC7\u5927\u3001\u672A\u538B\u7F29\u4E0E\u4EA7\u7269\u4F53\u79EF\u544A\u8B66",
         status: "implemented",
         implementedBy: ["bundle-size"]
       },
@@ -169,21 +164,31 @@ var init_capability_registry = __esm({
         id: "performance.tree-shaking",
         domain: "performance",
         label: "Tree-shaking / \u4EE3\u7801\u5206\u5272",
+        summary: "sideEffects \u7F3A\u5931\u3001\u5168\u91CF\u5F15\u5165\u4E0E chunk \u5212\u5206\u68C0\u67E5",
         status: "implemented",
         implementedBy: ["tree-shaking", "chunk-splitting"]
       },
       {
-        id: "performance.redos",
+        // 合并展示（2026-11-14）：嵌套循环 / 同步阻塞 IO / ReDoS 本来就同属「运行时反模式」
+        // （《07》性能域一行即如此归类）。此前拆成两张卡，空态底部变成 5 张卡、第二行孤零零
+        // 挂一张，与其余九页的 4 张卡版式不一致；合并后既不多宣称也不少宣称。
+        id: "performance.runtime",
         domain: "performance",
-        label: "ReDoS \u68C0\u6D4B\uFF08\u6B63\u5219\u707E\u96BE\u6027\u56DE\u6EAF\uFF09",
+        label: "\u8FD0\u884C\u65F6\u53CD\u6A21\u5F0F",
+        summary: "\u5D4C\u5957\u5FAA\u73AF\u3001\u540C\u6B65\u963B\u585E IO \u4E0E ReDoS \u707E\u96BE\u6027\u56DE\u6EAF",
         status: "implemented",
-        implementedBy: ["performance.redos"],
-        note: "\u7531 @zh/performance \u7684\u539F\u751F RedosDetectorImpl \u5B9E\u73B0\uFF08TS AST \u9759\u6001\u5206\u6790\u5D4C\u5957\u4E0D\u5B9A\u91CF\u8BCD\uFF09\uFF0C\u968F runPerformanceDomain \u5728\u684C\u9762\u7AEF\u771F\u5B9E\u6267\u884C \u2014\u2014 \u4E0D\u4F9D\u8D56 semgrep \u4E8C\u8FDB\u5236\uFF0C\u672A\u88C5\u5DE5\u5177\u4E5F\u80FD\u67E5\u3002\u5185\u6838 redos.yml \u662F semgrep \u5F62\u6001\u7684\u7B49\u4EF7\u8D44\u4EA7\uFF0C\u4FDD\u7559\u7ED9 CLI/CI \u53EF\u9009\u4F7F\u7528\uFF0C\u4F46\u684C\u9762\u7AEF\u4EE5\u539F\u751F\u63A2\u6D4B\u5668\u4E3A\u51C6 \uFF08\u6027\u80FD\u57DF\u8D70 domain-executor\uFF0C\u4E0D\u7ECF SOP \u89C4\u5219\u5F15\u64CE\uFF0C\u6545 semgrep \u89C4\u5219\u5728\u6B64\u4E0D\u4F1A\u88AB\u6267\u884C\uFF09\u3002"
+        implementedBy: [
+          "performance.runtime.nested-loop",
+          "performance.runtime.sync-io",
+          "performance.redos"
+        ],
+        note: "ReDoS \u7531 @zh/performance \u7684\u539F\u751F RedosDetectorImpl \u5B9E\u73B0\uFF08TS AST \u9759\u6001\u5206\u6790\u5D4C\u5957\u4E0D\u5B9A\u91CF\u8BCD\uFF09\uFF0C\u968F runPerformanceDomain \u5728\u684C\u9762\u7AEF\u771F\u5B9E\u6267\u884C \u2014\u2014 \u4E0D\u4F9D\u8D56 semgrep \u4E8C\u8FDB\u5236\uFF0C\u672A\u88C5\u5DE5\u5177\u4E5F\u80FD\u67E5\u3002\u5185\u6838 redos.yml \u662F semgrep \u5F62\u6001\u7684\u7B49\u4EF7\u8D44\u4EA7\uFF0C\u4FDD\u7559\u7ED9 CLI/CI \u53EF\u9009\u4F7F\u7528\uFF0C\u4F46\u684C\u9762\u7AEF\u4EE5\u539F\u751F\u63A2\u6D4B\u5668\u4E3A\u51C6 \uFF08\u6027\u80FD\u57DF\u8D70 domain-executor\uFF0C\u4E0D\u7ECF SOP \u89C4\u5219\u5F15\u64CE\uFF0C\u6545 semgrep \u89C4\u5219\u5728\u6B64\u4E0D\u4F1A\u88AB\u6267\u884C\uFF09\u3002"
       },
       {
         id: "performance.modern-api",
         domain: "performance",
         label: "\u73B0\u4EE3\u5316 API \u63A8\u8350\uFF08.at / spread\uFF09",
+        summary: "\u63A8\u8350 .at / spread \u7B49\u73B0\u4EE3 API \u66FF\u4EE3\u65E7\u5199\u6CD5",
         status: "planned",
         implementedBy: [],
         note: "\u5C1A\u65E0\u63A2\u6D4B\u5668\u3002"
@@ -192,6 +197,7 @@ var init_capability_registry = __esm({
         id: "performance.timer",
         domain: "performance",
         label: "\u5B9A\u65F6\u5668\u4F18\u5316\uFF08setTimeout / setInterval \u6EE5\u7528\uFF09",
+        summary: "\u68C0\u6D4B setTimeout / setInterval \u6EE5\u7528\u4E0E\u6CC4\u6F0F",
         status: "planned",
         implementedBy: [],
         note: "\u5C1A\u65E0\u63A2\u6D4B\u5668\u3002"
@@ -201,6 +207,7 @@ var init_capability_registry = __esm({
         id: "security.vuln.sql-injection",
         domain: "security",
         label: "SQL \u6CE8\u5165\u68C0\u6D4B",
+        summary: "semgrep \u68C0\u67E5\u62FC\u63A5 SQL \u4E0E\u672A\u53C2\u6570\u5316\u67E5\u8BE2",
         status: "implemented",
         implementedBy: ["security.scan.semgrep.sql-injection"]
       },
@@ -208,6 +215,7 @@ var init_capability_registry = __esm({
         id: "security.vuln.xss",
         domain: "security",
         label: "XSS \u68C0\u6D4B",
+        summary: "semgrep \u68C0\u67E5\u672A\u8F6C\u4E49\u8F93\u51FA\u4E0E\u5371\u9669 DOM \u5199\u5165",
         status: "implemented",
         implementedBy: ["security.scan.semgrep.xss"]
       },
@@ -215,6 +223,7 @@ var init_capability_registry = __esm({
         id: "security.vuln.command-injection",
         domain: "security",
         label: "\u547D\u4EE4\u6CE8\u5165\u68C0\u6D4B",
+        summary: "semgrep \u68C0\u67E5\u672A\u6821\u9A8C\u7684\u547D\u4EE4\u62FC\u63A5\u4E0E\u6267\u884C",
         status: "implemented",
         implementedBy: ["security.scan.semgrep.command-injection"]
       },
@@ -222,6 +231,7 @@ var init_capability_registry = __esm({
         id: "security.vuln.csrf",
         domain: "security",
         label: "CSRF \u68C0\u6D4B",
+        summary: "semgrep \u68C0\u67E5\u7F3A\u5C11 CSRF \u9632\u62A4\u7684\u5199\u64CD\u4F5C",
         status: "implemented",
         implementedBy: ["security.scan.semgrep.csrf"]
       },
@@ -229,6 +239,7 @@ var init_capability_registry = __esm({
         id: "security.vuln.path-traversal",
         domain: "security",
         label: "\u8DEF\u5F84\u7A7F\u8D8A\u68C0\u6D4B",
+        summary: "semgrep \u68C0\u67E5\u672A\u6821\u9A8C\u7684\u6587\u4EF6\u8DEF\u5F84\u62FC\u63A5",
         status: "implemented",
         implementedBy: ["security.scan.semgrep.path-traversal"]
       },
@@ -236,6 +247,7 @@ var init_capability_registry = __esm({
         id: "security.secrets",
         domain: "security",
         label: "\u786C\u7F16\u7801\u5BC6\u94A5\u68C0\u6D4B",
+        summary: "gitleaks \u8BC6\u522B\u786C\u7F16\u7801\u5BC6\u94A5\u4E0E\u8BBF\u95EE\u4EE4\u724C",
         status: "implemented",
         implementedBy: ["security.scan.gitleaks.hardcoded-key"]
       },
@@ -243,6 +255,7 @@ var init_capability_registry = __esm({
         id: "security.malware",
         domain: "security",
         label: "\u6076\u610F\u4EE3\u7801\u7279\u5F81\uFF08\u53CD\u5F39 Shell / \u540E\u95E8 / \u4F9B\u5E94\u94FE\u6295\u6BD2\uFF09",
+        summary: "\u626B\u63CF\u53CD\u5F39 Shell\u3001\u540E\u95E8\u4E0E\u4F9B\u5E94\u94FE\u6295\u6BD2\u7279\u5F81",
         status: "implemented",
         // 实现证据是**恶意代码类型**（@zh/security 的启发式正则通道产出），
         // 不是 SOP 规则 id —— 那 3 条同名 SOP 规则是 draft/trial，从不求值。
@@ -261,6 +274,7 @@ var init_capability_registry = __esm({
         id: "security.compliance",
         domain: "security",
         label: "\u5408\u89C4\u57FA\u7EBF\uFF08ASVS L1 \u5B50\u96C6\uFF09",
+        summary: "\u628A\u5404\u57DF\u5DF2\u843D\u76D8\u7ED3\u8BBA\u6C47\u603B\u4E3A ASVS L1 \u6761\u6B3E\u89C6\u56FE",
         status: "implemented",
         // 实现证据是桌面端只读映射器（packages/desktop/src/compliance/baseline.ts）：
         // 它把各域已落盘结论按标准条款汇总成五态，不启动任何扫描 —— 合规是**视图**，
@@ -271,6 +285,7 @@ var init_capability_registry = __esm({
         id: "security.standard",
         domain: "security",
         label: "\u5B89\u5168\u7F16\u7801\u89C4\u8303\u68C0\u67E5",
+        summary: "\u4EE3\u7801\u89C4\u8303\u68C0\u67E5\u5F52\u9879\u76EE\u4F53\u68C0\uFF08ESLint / \u7C7B\u578B\u5B89\u5168\uFF09",
         status: "deprecated",
         implementedBy: [],
         // 代码规范检查按 C1 唯一归属属项目体检（ESLint / 类型安全）；安全侧不再单列，
@@ -281,6 +296,7 @@ var init_capability_registry = __esm({
         id: "security.dependency",
         domain: "security",
         label: "\u4F9D\u8D56 CVE \u68C0\u6D4B",
+        summary: "\u4F9D\u8D56 CVE \u68C0\u6D4B\u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF08OSV\uFF09",
         status: "deprecated",
         implementedBy: [],
         note: "\u6309\u300A07\u300BO2 / O10 \u552F\u4E00\u5F52\u4F9D\u8D56\u7BA1\u5BB6\uFF08OSV\uFF09\uFF0C\u5B89\u5168\u57DF\u4E0D\u518D\u4E8C\u6B21\u4E0A\u62A5\u3002\u5B89\u5168\u9875\u7A7A\u6001\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\uFF1B\u4F9D\u8D56\u9875\u8D1F\u8D23\u3002"
@@ -289,14 +305,28 @@ var init_capability_registry = __esm({
       {
         id: "garbage.unused-file",
         domain: "garbage",
-        label: "\u65E0\u7528\u6587\u4EF6\u4E0E\u6B8B\u7559\u4EA7\u7269",
+        label: "\u65E0\u7528\u6587\u4EF6\u4E0E\u7CFB\u7EDF\u6B8B\u7559",
+        summary: "\u8BC6\u522B\u672A\u5F15\u7528\u8D44\u6E90\u3001.DS_Store \u4E0E\u65E5\u5FD7\u4E34\u65F6\u6587\u4EF6",
         status: "implemented",
-        implementedBy: ["garbage.detect.fs"]
+        implementedBy: ["garbage.detect.fs", "unused-file"]
+      },
+      {
+        // 从 garbage.unused-file 拆出来（2026-11-14）：文件系统检测器本来就把「残留 / 临时文件」
+        // 与「可再生成的构建产物目录」当两类产出（GarbageItemType 里也是两个类型、删除授权
+        // 口径不同），合在一张卡里说「残留产物」既含糊又少一张卡，《07》垃圾域一行也把
+        // 「构建产物」单列。拆开后四张卡与结果页的四类统计口径对齐。
+        id: "garbage.build-artifact",
+        domain: "garbage",
+        label: "\u6784\u5EFA\u4EA7\u7269\uFF08\u53EF\u518D\u751F\u76EE\u5F55\uFF09",
+        summary: "dist / build / coverage \u7B49\u53EF\u91CD\u65B0\u751F\u6210\u7684\u76EE\u5F55",
+        status: "implemented",
+        implementedBy: ["garbage.detect.fs", "build-artifact"]
       },
       {
         id: "garbage.dead-code",
         domain: "garbage",
         label: "\u6B7B\u4EE3\u7801\uFF08\u672A\u4F7F\u7528\u7684\u5BFC\u51FA\uFF09",
+        summary: "ts-prune \u627E\u51FA\u65E0\u4EBA\u5F15\u7528\u7684\u5BFC\u51FA",
         status: "implemented",
         implementedBy: ["garbage.scan.cleanup.dead-code"]
       },
@@ -304,6 +334,7 @@ var init_capability_registry = __esm({
         id: "garbage.unused-dependency",
         domain: "garbage",
         label: "\u672A\u4F7F\u7528\u4F9D\u8D56",
+        summary: "depcheck \u627E\u51FA\u6E05\u5355\u4E2D\u672A\u88AB\u5F15\u7528\u7684\u4F9D\u8D56",
         status: "implemented",
         implementedBy: ["garbage.scan.cleanup.unused-dependency"]
       },
@@ -311,6 +342,7 @@ var init_capability_registry = __esm({
         id: "garbage.duplicate-code",
         domain: "garbage",
         label: "\u91CD\u590D\u4EE3\u7801",
+        summary: "\u91CD\u590D\u4EE3\u7801\u660E\u7EC6\u552F\u4E00\u5F52\u91CD\u6784\u57DF",
         status: "deprecated",
         implementedBy: [],
         note: "\u6309\u300A07\u300BO1 \u552F\u4E00\u5F52\u91CD\u6784\u57DF\u3002\u5783\u573E\u9875\u7A7A\u6001\u4E0D\u5F97\u5BA3\u79F0\u6B64\u9879\u3002"
@@ -320,20 +352,35 @@ var init_capability_registry = __esm({
         id: "refactor.duplicate-code",
         domain: "refactor",
         label: "\u91CD\u590D\u4EE3\u7801",
+        summary: "jscpd \u5B9A\u4F4D\u53EF\u5408\u5E76\u7684\u91CD\u590D\u5B9E\u73B0",
         status: "implemented",
         implementedBy: ["duplicated-code"]
       },
       {
-        id: "refactor.smells",
+        // 拆分（2026-11-14）：原先一张卡把函数级（long-method / deep-nesting）与
+        // 结构级（large-class / god-object）异味塞在一起，措辞「过长函数 / 圈复杂度 /
+        // 深层嵌套」只覆盖了前一半，等于把后一半藏起来。两类坏味道由不同探测器产出、
+        // 修复方式也不同，拆成两张卡既准确又补齐了 4 张卡版式。
+        id: "refactor.smells.function",
         domain: "refactor",
-        label: "\u4EE3\u7801\u5F02\u5473\uFF08\u8FC7\u957F\u51FD\u6570 / \u5708\u590D\u6742\u5EA6 / \u6DF1\u5C42\u5D4C\u5957\uFF09",
+        label: "\u51FD\u6570\u7EA7\u5F02\u5473",
+        summary: "\u68C0\u6D4B\u8FC7\u957F\u51FD\u6570\u3001\u8FC7\u957F\u53C2\u6570\u4E0E\u6DF1\u5C42\u5D4C\u5957",
         status: "implemented",
-        implementedBy: ["long-method", "deep-nesting", "large-class", "god-object"]
+        implementedBy: ["long-method", "long-parameter-list", "deep-nesting"]
+      },
+      {
+        id: "refactor.smells.structure",
+        domain: "refactor",
+        label: "\u7ED3\u6784\u7EA7\u5F02\u5473",
+        summary: "\u68C0\u6D4B\u8D85\u5927\u7C7B\u3001\u4E0A\u5E1D\u5BF9\u8C61\u4E0E\u4F9D\u604B\u60C5\u7ED3",
+        status: "implemented",
+        implementedBy: ["large-class", "god-object", "feature-envy"]
       },
       {
         id: "refactor.auto-fix",
         domain: "refactor",
         label: "\u4E00\u952E\u5E94\u7528\u63A8\u8350\u91CD\u6784\u65B9\u6848",
+        summary: "\u9AD8\u7F6E\u4FE1\u95EE\u9898\u4E00\u952E\u6539\u5199\uFF0C\u5199\u76D8\u524D\u81EA\u52A8\u5907\u4EFD",
         status: "implemented",
         // 实现证据 = 存在修复生成器（且检测器把它标为 autoFixable）的高置信坏味道类型。
         // 现这两类既有检测器（ruleId 可达），又有 auto-fix 生成器（auto-fix.ts 的 FIX_GENERATORS）。
@@ -344,7 +391,8 @@ var init_capability_registry = __esm({
       {
         id: "inspect.architecture",
         domain: "inspect",
-        label: "\u67B6\u6784\u89C4\u8303\uFF08\u5FAA\u73AF\u4F9D\u8D56 / \u5206\u5C42\u8FB9\u754C / \u6A21\u5757\u4F9D\u8D56\uFF09",
+        label: "\u67B6\u6784\u89C4\u8303",
+        summary: "\u5FAA\u73AF\u4F9D\u8D56 / \u5206\u5C42\u8FB9\u754C / \u6A21\u5757\u4F9D\u8D56\u626B\u63CF\uFF0C\u9632\u6B62\u67B6\u6784\u8150\u5316",
         status: "implemented",
         implementedBy: [
           "inspect.scan.depcruiser.circular-dependency",
@@ -355,7 +403,8 @@ var init_capability_registry = __esm({
       {
         id: "inspect.type-safety",
         domain: "inspect",
-        label: "\u7C7B\u578B\u5B89\u5168\uFF08\u771F\u5B9E tsc \u68C0\u67E5 + \u7A7A\u5B89\u5168 / \u7C7B\u578B\u4E00\u81F4\u6027\uFF09",
+        label: "\u7C7B\u578B\u5B89\u5168",
+        summary: "\u771F\u5B9E tsc \u7C7B\u578B\u68C0\u67E5\uFF0C\u53E0\u52A0\u7A7A\u5B89\u5168\u4E0E\u7C7B\u578B\u4E00\u81F4\u6027\u626B\u63CF",
         status: "implemented",
         implementedBy: [
           "inspect.scan.typescript.type-error-check",
@@ -367,14 +416,16 @@ var init_capability_registry = __esm({
       {
         id: "inspect.code-style",
         domain: "inspect",
-        label: "\u4EE3\u7801\u89C4\u8303\uFF08\u4E25\u683C\u6A21\u5F0F / \u679A\u4E3E\u4F7F\u7528\uFF09",
+        label: "\u4EE3\u7801\u89C4\u8303",
+        summary: "TS \u4E25\u683C\u6A21\u5F0F\u914D\u7F6E\u3001\u679A\u4E3E\u4E0E\u5E38\u91CF\u4F7F\u7528\u89C4\u8303",
         status: "implemented",
         implementedBy: ["inspect.scan.internal.strict-mode", "inspect.scan.internal.enum-usage"]
       },
       {
         id: "inspect.module-boundary",
         domain: "inspect",
-        label: "\u6A21\u5757\u8FB9\u754C\u4E0E\u4F9D\u8D56\u6CE8\u5165\u5408\u89C4",
+        label: "\u6A21\u5757\u8FB9\u754C",
+        summary: "\u5206\u5C42\u4F9D\u8D56\u65B9\u5411\u3001NestJS \u6A21\u5757\u8FB9\u754C\u4E0E\u4F9D\u8D56\u6CE8\u5165\u5408\u89C4",
         status: "implemented",
         implementedBy: [
           "inspect.scan.ironnest.dependency-injection",
@@ -5464,8 +5515,8 @@ var init_zh_Hans = __esm({
                 title: "\u81EA\u52A8\u540C\u6B65"
               }
             },
-            subtitle: "\u4E3A\u9879\u76EE\u914D\u7F6E\u4E0E\u5173\u952E\u6587\u4EF6\u4FDD\u7559\u53EF\u56DE\u6EDA\u5FEB\u7167\uFF0C\u652F\u6301\u672C\u5730\u4E0E GitHub \u53CC\u901A\u9053",
-            title: "\u4FDD\u62A4\u91CD\u8981\u914D\u7F6E\uFF0C\u6570\u636E\u6C38\u4E0D\u4E22\u5931"
+            subtitle: "\u914D\u7F6E\u4E0E\u5173\u952E\u6587\u4EF6\u7559\u5FEB\u7167\uFF0C\u672C\u5730\u4E0E GitHub \u53CC\u901A\u9053",
+            title: "\u914D\u7F6E\u968F\u65F6\u53EF\u56DE\u6EDA"
           },
           noRecords: "\u6682\u65E0\u5907\u4EFD\u8BB0\u5F55",
           oneClickBackup: "\u4E00\u952E\u5907\u4EFD",
@@ -5541,8 +5592,8 @@ var init_zh_Hans = __esm({
           ecosystem: "\u751F\u6001",
           empty: {
             start: "\u5F00\u59CB\u76D8\u70B9",
-            subtitle: "\u89E3\u6790\u9501\u6587\u4EF6\u4E0E\u4F9D\u8D56\u6E05\u5355\uFF0C\u7ED8\u5236\u4F9D\u8D56\u56FE\u8C31\u5E76\u6821\u9A8C\u5B8C\u6574\u6027",
-            title: "\u7BA1\u5BB6\u76D8\u70B9\uFF0C\u770B\u6E05\u56FE\u8C31"
+            subtitle: "\u6838\u9A8C\u4F9D\u8D56\u5B8C\u6574\u6027\u3001\u8BB8\u53EF\u8BC1\u4E0E\u5DF2\u77E5\u6F0F\u6D1E",
+            title: "\u76D8\u70B9\u4F9D\u8D56\u98CE\u9669"
           },
           env: "\u73AF\u5883\u4E00\u81F4\u6027",
           "env.actual": "\u5B9E\u9645\uFF1A{{value}}",
@@ -5699,8 +5750,8 @@ var init_zh_Hans = __esm({
           dependencyHint: "\u672A\u7528\u4F9D\u8D56\u4E0D\u81EA\u52A8\u5220\u9664\uFF0C\u786E\u8BA4\u65E0\u5F15\u7528\u540E\u53EF\u4ECE package.json \u624B\u52A8\u79FB\u9664",
           done: "\u5783\u573E\u6E05\u7406\u5B8C\u6210",
           empty: {
-            subtitle: "\u626B\u63CF\u672A\u4F7F\u7528\u6587\u4EF6\u3001\u5197\u4F59\u4F9D\u8D56\u4E0E\u6B7B\u4EE3\u7801",
-            title: "\u6E05\u7406\u65E0\u7528\u6587\u4EF6\uFF0C\u4E3A\u9879\u76EE\u51CF\u8D1F"
+            subtitle: "\u627E\u51FA\u65E0\u7528\u6587\u4EF6\u3001\u6784\u5EFA\u4EA7\u7269\u4E0E\u672A\u7528\u4F9D\u8D56",
+            title: "\u6E05\u7406\u9879\u76EE\u5783\u573E"
           },
           emptyList: "\u9879\u76EE\u5F88\u5E72\u51C0\uFF0C\u6CA1\u6709\u53EF\u6E05\u7406\u7684\u5783\u573E",
           feature: {
@@ -5760,6 +5811,9 @@ var init_zh_Hans = __esm({
           copiedAll: "\u5DF2\u590D\u5236\u5168\u90E8 {{count}} \u6761\u95EE\u9898\uFF0C\u53EF\u7C98\u8D34\u5230 AI \u4FEE\u590D",
           copyAllPrompt: "{{count}} \u9879\u9700\u5904\u7406\uFF0C\u53EF\u4E00\u952E\u590D\u5236\u5168\u90E8\u5230 AI \u4FEE\u590D",
           duration: "\u626B\u63CF\u8017\u65F6 {{duration}}ms",
+          empty: {
+            title: "\u5B88\u4F4F\u6BCF\u6B21\u63D0\u4EA4"
+          },
           falsePositiveCount: "\u8BEF\u62A5\u53CD\u9988 {{count}} \u6761",
           falsePositiveSubmitted: "\u5DF2\u63D0\u4EA4\u8BEF\u62A5\u53CD\u9988\uFF0C\u5C06\u7528\u4E8E\u6821\u51C6\u89C4\u5219",
           feature: {
@@ -5784,7 +5838,7 @@ var init_zh_Hans = __esm({
             subtitle: "hook \u81EA\u52A8\u89E6\u53D1 + \u624B\u52A8\u626B\u63CF\u843D\u5E93",
             title: "\u6700\u8FD1\u62E6\u622A\u8BB0\u5F55"
           },
-          idleSubtitle: "\u5B9E\u65F6\u5B88\u62A4\u4EE3\u7801\u53D8\u66F4\uFF0C\u5728\u63D0\u4EA4/\u63A8\u9001/CI \u5173\u5361\u81EA\u52A8\u62E6\u622A",
+          idleSubtitle: "\u63D0\u4EA4\u3001\u63A8\u9001\u4E0E CI \u4E09\u9053\u5173\u5361\u81EA\u52A8\u62E6\u622A",
           lastBlockAt: "\u6700\u8FD1 {{time}}",
           lastScan: "\u4E0A\u6B21\u626B\u63CF \xB7 {{time}}",
           level: {
@@ -5852,8 +5906,8 @@ var init_zh_Hans = __esm({
           copyAllPrompt: "{{count}} \u9879\u9700\u5904\u7406\uFF0C\u53EF\u4E00\u952E\u590D\u5236\u5168\u90E8\u5230 AI \u4FEE\u590D",
           done: "\u5DE1\u68C0\u5B8C\u6210",
           empty: {
-            subtitle: "\u6BCF\u5929\u81EA\u52A8\u5DE1\u68C0\u67B6\u6784\u89C4\u8303\u4E0E\u7C7B\u578B\u5B89\u5168\uFF0C\u4E5F\u53EF\u70B9\u51FB\u4E00\u952E\u4F53\u68C0",
-            title: "\u4F53\u68C0\u9879\u76EE\u67B6\u6784\u4E0E\u7C7B\u578B\u5B89\u5168"
+            subtitle: "\u5DE1\u68C0\u5206\u5C42\u4F9D\u8D56\u3001\u7C7B\u578B\u5B89\u5168\u4E0E\u4EE3\u7801\u89C4\u8303",
+            title: "\u67B6\u6784\u4E0E\u7C7B\u578B\u4F53\u68C0"
           },
           feature: {
             architecture: {
@@ -5944,8 +5998,8 @@ var init_zh_Hans = __esm({
               title: "\u5B9A\u65F6\u5668\u4F18\u5316"
             },
             start: "\u5F00\u59CB\u68C0\u6D4B",
-            subtitle: "\u626B\u63CF\u4F4E\u6548\u6570\u7EC4\u904D\u5386\u3001\u6B63\u5219\u91CD\u590D\u7F16\u8BD1\u3001\u5197\u4F59\u5206\u914D\u7B49\u6027\u80FD\u95EE\u9898",
-            title: "\u68C0\u6D4B\u8FD0\u884C\u65F6\u6027\u80FD\u53CD\u6A21\u5F0F\uFF0C\u4F18\u5316\u6267\u884C\u6548\u7387"
+            subtitle: "\u68C0\u6D4B\u4F4E\u6548\u5FAA\u73AF\u3001\u963B\u585E IO\u3001\u4F53\u79EF\u8D85\u6807\u4E0E\u6B63\u5219\u56DE\u6EAF",
+            title: "\u627E\u51FA\u6027\u80FD\u74F6\u9888"
           },
           source: "\u6027\u80FD",
           suggestion: "\u5EFA\u8BAE\uFF1A{{suggestion}}",
@@ -5955,6 +6009,7 @@ var init_zh_Hans = __esm({
         },
         refactor: {
           addProjectFirst: "\u8BF7\u5148\u5728\u4EEA\u8868\u76D8\u6DFB\u52A0\u9879\u76EE",
+          fileCount: "{{count}} \u4E2A\u6587\u4EF6",
           groupedIssues: "\u91CD\u6784\u95EE\u9898\uFF08\u6309\u7C7B\u578B\u5206\u7EC4\uFF09",
           groupsSummary: "{{groups}} \u7C7B \xB7 {{total}} \u5904",
           header: {
@@ -5988,8 +6043,8 @@ var init_zh_Hans = __esm({
               desc: "\u68C0\u6D4B\u91CD\u590D\u4EE3\u7801\u3001\u8FC7\u957F\u51FD\u6570\u3001\u9AD8\u5708\u590D\u6742\u5EA6\u7B49\u95EE\u9898",
               title: "\u4EE3\u7801\u5F02\u5473"
             },
-            subtitle: "\u6BCF\u5929\u81EA\u52A8\u68C0\u67E5\u4E00\u6B21\u4EE3\u7801\u91CD\u590D\u3001\u4EE3\u7801\u5F02\u5473\u3001\u8FC7\u957F\u51FD\u6570\u7B49\uFF0C\u4E00\u952E\u5E94\u7528\u63A8\u8350\u91CD\u6784\u65B9\u6848",
-            title: "\u4F18\u5316\u4EE3\u7801\u7ED3\u6784\uFF0C\u6D88\u9664\u6280\u672F\u503A\u52A1"
+            subtitle: "\u67E5\u91CD\u590D\u4EE3\u7801\u4E0E\u574F\u5473\u9053\uFF0C\u4E00\u952E\u5E94\u7528\u63A8\u8350\u65B9\u6848",
+            title: "\u6D88\u9664\u4EE3\u7801\u5F02\u5473"
           },
           smell: {
             callbackHell: "\u56DE\u8C03\u5730\u72F1",
@@ -6069,6 +6124,10 @@ var init_zh_Hans = __esm({
           },
           empty: {
             feature: {
+              gate: {
+                title: "\u95E8\u7981\u7ED3\u8BBA",
+                desc: "\u6C47\u603B\u63D0\u4EA4 / \u63A8\u9001 / CI \u95E8\u7981\u7ED3\u8BBA\uFF0C\u770B\u6E05\u662F\u5426\u53EF\u653E\u884C"
+              },
               module: {
                 title: "\u6A21\u5757\u7EA7\u8BC4\u5206",
                 desc: "\u6309\u9879\u76EE\u753B\u50CF\u62C6\u5206\u5230\u5404\u6A21\u5757\uFF0C\u5206\u522B\u7ED9\u51FA\u5065\u5EB7\u5F97\u5206"
@@ -6082,8 +6141,8 @@ var init_zh_Hans = __esm({
                 title: "\u8D8B\u52BF\u5BF9\u6BD4"
               }
             },
-            subtitle: "\u5C1A\u65E0\u8BC4\u5206\u62A5\u544A \u2014\u2014 \u8DD1\u4E00\u6B21\u9879\u76EE\u4F53\u68C0\uFF0C\u8FD9\u91CC\u4F1A\u6C89\u6DC0\u6BCF\u6B21\u7684\u5065\u5EB7\u5206\u4E0E\u8D8B\u52BF",
-            title: "\u591A\u7EF4\u5EA6\u5206\u6790\u62A5\u544A\uFF0C\u51B3\u7B56\u66F4\u6709\u4F9D\u636E"
+            subtitle: "\u5C1A\u65E0\u62A5\u544A\uFF0C\u8DD1\u4E00\u6B21\u4F53\u68C0\u540E\u5728\u8FD9\u91CC\u770B\u8D8B\u52BF",
+            title: "\u770B\u6E05\u8D28\u91CF\u8D8B\u52BF"
           },
           generate: "\u6C47\u603B\u751F\u6210\u62A5\u544A",
           generating: "\u751F\u6210\u4E2D...",
@@ -6227,8 +6286,8 @@ var init_zh_Hans = __esm({
           copyAllPrompt: "{{count}} \u9879\u9700\u5904\u7406\uFF0C\u53EF\u4E00\u952E\u590D\u5236\u5168\u90E8\u5230 AI \u4FEE\u590D",
           done: "\u5B89\u5168\u68C0\u67E5\u5B8C\u6210",
           empty: {
-            subtitle: "\u591A\u5F15\u64CE\u6DF1\u5EA6\u626B\u63CF\u6F0F\u6D1E\u4E0E\u6076\u610F\u4EE3\u7801\uFF0C\u7ED3\u679C\u4E0E\u5DE5\u5177\u53EF\u7528\u6027\u4E00\u5E76\u5448\u73B0",
-            title: "\u6DF1\u5EA6\u626B\u63CF\u6F0F\u6D1E\uFF0C\u4FEE\u590D\u5B89\u5168\u9690\u60A3"
+            subtitle: "\u591A\u5F15\u64CE\u626B\u63CF\u6F0F\u6D1E\u3001\u6076\u610F\u4EE3\u7801\u4E0E\u786C\u7F16\u7801\u5BC6\u94A5",
+            title: "\u626B\u6E05\u5B89\u5168\u9690\u60A3"
           },
           feature: {
             dependency: {
@@ -6335,10 +6394,10 @@ var init_zh_Hans = __esm({
               desc: "\u6587\u4EF6\u53D8\u66F4 / \u65E5\u5FD7 / \u8FD0\u884C\u8FDB\u7A0B\uFF0C\u6309\u9879\u76EE\u81EA\u52A8\u63A2\u6D4B",
               title: "\u4E09\u6E90\u76D1\u63A7"
             },
-            subtitleIdle: "\u5F53\u524D\u76D1\u63A7 0 \u4E2A\u6587\u4EF6\uFF0C\u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\u542F\u52A8",
-            subtitleMonitoring: "\u76D1\u63A7\u4E2D\uFF08\u81EA\u52A8\uFF0C7\xD724\uFF09\u2014\u2014\u6B63\u5728\u5B88\u62A4\u5F53\u524D\u9879\u76EE",
-            titleIdle: "24\u5C0F\u65F6\u65E0\u95F4\u65AD\u76D1\u63A7\uFF0C\u5F02\u5E38\u65E0\u6240\u9041\u5F62",
-            titleMonitoring: "\u76D1\u63A7\u5DF2\u542F\u52A8\uFF0C\u5F02\u5E38\u65E0\u6240\u9041\u5F62"
+            subtitleIdle: "\u70B9\u51FB\u4E0B\u65B9\u6309\u94AE\uFF0C\u5F00\u59CB\u5B88\u62A4\u5F53\u524D\u9879\u76EE",
+            subtitleMonitoring: "7\xD724 \u5B88\u62A4\u6587\u4EF6\u3001\u65E5\u5FD7\u4E0E\u8FDB\u7A0B\u5F02\u5E38",
+            titleIdle: "\u76D1\u63A7\u672A\u542F\u52A8",
+            titleMonitoring: "\u76D1\u63A7\u8FD0\u884C\u4E2D"
           },
           source: {
             backend: "\u540E\u7AEF",
@@ -6401,8 +6460,8 @@ var init_zh_Hans = __esm({
           },
           empty: {
             start: "\u5F00\u59CB\u76D8\u70B9",
-            subtitle: "\u5206\u6790\u626B\u63CF\u95EE\u9898\u4E0E\u6A21\u5757\u70ED\u5EA6\uFF0C\u4F30\u7B97\u5229\u606F\u4E0E\u672C\u91D1\uFF0C\u6309 ROI \u6392\u5E8F\u7ED9\u51FA\u507F\u8FD8\u5EFA\u8BAE",
-            title: "\u91CF\u5316\u6280\u672F\u503A\uFF0C\u628A\u8BC4\u5206\u53D8\u6210\u884C\u52A8"
+            subtitle: "\u4F30\u7B97\u5229\u606F\u4E0E\u672C\u91D1\uFF0C\u6309 ROI \u6392\u51FA\u507F\u8FD8\u987A\u5E8F",
+            title: "\u91CF\u5316\u6280\u672F\u503A"
           },
           errorTitle: "\u76D8\u70B9\u5931\u8D25",
           factor: {
@@ -7784,8 +7843,8 @@ var init_zh_Hant = __esm({
                 title: "\u81EA\u52D5\u540C\u6B65"
               }
             },
-            subtitle: "\u70BA\u5C08\u6848\u8A2D\u5B9A\u8207\u95DC\u9375\u6A94\u6848\u4FDD\u7559\u53EF\u56DE\u6EFE\u5FEB\u7167\uFF0C\u652F\u63F4\u672C\u5730\u8207 GitHub \u96D9\u901A\u9053",
-            title: "\u4FDD\u8B77\u91CD\u8981\u914D\u7F6E\uFF0C\u8CC7\u6599\u6C38\u4E0D\u4E1F\u5931"
+            subtitle: "\u8A2D\u5B9A\u8207\u95DC\u9375\u6A94\u6848\u7559\u5FEB\u7167\uFF0C\u672C\u6A5F\u8207 GitHub \u96D9\u901A\u9053",
+            title: "\u8A2D\u5B9A\u96A8\u6642\u53EF\u56DE\u6EFE"
           },
           noRecords: "\u66AB\u7121\u5099\u4EFD\u8A18\u9304",
           oneClickBackup: "\u4E00\u9375\u5099\u4EFD",
@@ -7861,8 +7920,8 @@ var init_zh_Hant = __esm({
           ecosystem: "\u751F\u614B",
           empty: {
             start: "\u958B\u59CB\u76E4\u9EDE",
-            subtitle: "\u89E3\u6790\u9396\u6A94\u6848\u8207\u4F9D\u8CF4\u6E05\u55AE\uFF0C\u7E6A\u88FD\u4F9D\u8CF4\u5716\u8B5C\u4E26\u6821\u9A57\u5B8C\u6574\u6027",
-            title: "\u76E4\u9EDE\u4F9D\u8CF4\uFF0C\u770B\u6E05\u5716\u8B5C"
+            subtitle: "\u6838\u9A57\u4F9D\u8CF4\u5B8C\u6574\u6027\u3001\u6388\u6B0A\u689D\u6B3E\u8207\u5DF2\u77E5\u6F0F\u6D1E",
+            title: "\u76E4\u9EDE\u4F9D\u8CF4\u98A8\u96AA"
           },
           env: "\u74B0\u5883\u4E00\u81F4\u6027",
           "env.actual": "\u5BE6\u969B\uFF1A{{value}}",
@@ -8019,8 +8078,8 @@ var init_zh_Hant = __esm({
           dependencyHint: "\u672A\u7528\u4F9D\u8CF4\u4E0D\u81EA\u52D5\u522A\u9664\uFF0C\u78BA\u8A8D\u7121\u5F15\u7528\u5F8C\u53EF\u5F9E package.json \u624B\u52D5\u79FB\u9664",
           done: "\u5783\u573E\u6E05\u7406\u5B8C\u6210",
           empty: {
-            subtitle: "\u6383\u63CF\u672A\u4F7F\u7528\u6A94\u6848\u3001\u5197\u9918\u4F9D\u8CF4\u8207\u6B7B\u7A0B\u5F0F\u78BC",
-            title: "\u6E05\u7406\u7121\u7528\u6A94\u6848\uFF0C\u70BA\u5C08\u6848\u6E1B\u8CA0"
+            subtitle: "\u627E\u51FA\u7121\u7528\u6A94\u6848\u3001\u5EFA\u7F6E\u7522\u7269\u8207\u672A\u7528\u4F9D\u8CF4",
+            title: "\u6E05\u7406\u5C08\u6848\u5783\u573E"
           },
           emptyList: "\u5C08\u6848\u5F88\u4E7E\u6DE8\uFF0C\u6C92\u6709\u53EF\u6E05\u7406\u7684\u5783\u573E",
           feature: {
@@ -8080,6 +8139,9 @@ var init_zh_Hant = __esm({
           copiedAll: "\u5DF2\u8907\u88FD\u5168\u90E8 {{count}} \u689D\u554F\u984C\uFF0C\u53EF\u8CBC\u4E0A\u5230 AI \u4FEE\u5FA9",
           copyAllPrompt: "{{count}} \u9805\u9700\u8655\u7406\uFF0C\u53EF\u4E00\u9375\u8907\u88FD\u5168\u90E8\u5230 AI \u4FEE\u5FA9",
           duration: "\u6383\u63CF\u8017\u6642 {{duration}}ms",
+          empty: {
+            title: "\u5B88\u4F4F\u6BCF\u6B21\u63D0\u4EA4"
+          },
           falsePositiveCount: "\u8AA4\u5831\u53CD\u994B {{count}} \u689D",
           falsePositiveSubmitted: "\u5DF2\u63D0\u4EA4\u8AA4\u5831\u53CD\u994B\uFF0C\u5C07\u7528\u65BC\u6821\u6E96\u898F\u5247",
           feature: {
@@ -8104,7 +8166,7 @@ var init_zh_Hant = __esm({
             subtitle: "hook \u81EA\u52D5\u89F8\u767C + \u624B\u52D5\u6383\u63CF\u843D\u5EAB",
             title: "\u6700\u8FD1\u6514\u622A\u8A18\u9304"
           },
-          idleSubtitle: "\u5373\u6642\u5B88\u8B77\u7A0B\u5F0F\u78BC\u8B8A\u66F4\uFF0C\u5728\u63D0\u4EA4/\u63A8\u9001/CI \u95DC\u5361\u81EA\u52D5\u6514\u622A",
+          idleSubtitle: "\u63D0\u4EA4\u3001\u63A8\u9001\u8207 CI \u4E09\u9053\u95DC\u5361\u81EA\u52D5\u6514\u622A",
           lastBlockAt: "\u6700\u8FD1 {{time}}",
           lastScan: "\u4E0A\u6B21\u6383\u63CF \xB7 {{time}}",
           level: {
@@ -8172,8 +8234,8 @@ var init_zh_Hant = __esm({
           copyAllPrompt: "{{count}} \u9805\u9700\u8655\u7406\uFF0C\u53EF\u4E00\u9375\u8907\u88FD\u5168\u90E8\u5230 AI \u4FEE\u5FA9",
           done: "\u5DE1\u6AA2\u5B8C\u6210",
           empty: {
-            subtitle: "\u6BCF\u5929\u81EA\u52D5\u5DE1\u6AA2\u67B6\u69CB\u898F\u7BC4\u8207\u578B\u5225\u5B89\u5168\uFF0C\u4E5F\u53EF\u9EDE\u9078\u4E00\u9375\u9AD4\u6AA2",
-            title: "\u9AD4\u6AA2\u5C08\u6848\u67B6\u69CB\u8207\u578B\u5225\u5B89\u5168"
+            subtitle: "\u5DE1\u6AA2\u5206\u5C64\u4F9D\u8CF4\u3001\u578B\u5225\u5B89\u5168\u8207\u7A0B\u5F0F\u78BC\u898F\u7BC4",
+            title: "\u67B6\u69CB\u8207\u578B\u5225\u9AD4\u6AA2"
           },
           feature: {
             architecture: {
@@ -8264,8 +8326,8 @@ var init_zh_Hant = __esm({
               title: "\u5B9A\u6642\u5668\u6700\u4F73\u5316"
             },
             start: "\u958B\u59CB\u6AA2\u6E2C",
-            subtitle: "\u6383\u63CF\u4F4E\u6548\u9663\u5217\u904D\u6B77\u3001\u6B63\u5247\u91CD\u8907\u7DE8\u8B6F\u3001\u5197\u9918\u5206\u914D\u7B49\u6548\u80FD\u554F\u984C",
-            title: "\u6AA2\u6E2C\u57F7\u884C\u6642\u6548\u80FD\u53CD\u6A21\u5F0F\uFF0C\u6700\u4F73\u5316\u57F7\u884C\u6548\u7387"
+            subtitle: "\u6AA2\u6E2C\u4F4E\u6548\u8FF4\u5708\u3001\u963B\u585E IO\u3001\u9AD4\u7A4D\u8D85\u6A19\u8207\u6B63\u5247\u56DE\u6EAF",
+            title: "\u627E\u51FA\u6548\u80FD\u74F6\u9838"
           },
           source: "\u6548\u80FD",
           suggestion: "\u5EFA\u8B70\uFF1A{{suggestion}}",
@@ -8275,6 +8337,7 @@ var init_zh_Hant = __esm({
         },
         refactor: {
           addProjectFirst: "\u8ACB\u5148\u5728\u5100\u8868\u76E4\u65B0\u589E\u5C08\u6848",
+          fileCount: "{{count}} \u500B\u6A94\u6848",
           groupedIssues: "\u91CD\u69CB\u554F\u984C\uFF08\u6309\u578B\u5225\u5206\u7D44\uFF09",
           groupsSummary: "{{groups}} \u985E \xB7 {{total}} \u8655",
           header: {
@@ -8308,8 +8371,8 @@ var init_zh_Hant = __esm({
               desc: "\u6AA2\u6E2C\u91CD\u8907\u7A0B\u5F0F\u78BC\u3001\u904E\u9577\u51FD\u5F0F\u3001\u9AD8\u5708\u8907\u96DC\u5EA6\u7B49\u554F\u984C",
               title: "\u7A0B\u5F0F\u78BC\u7570\u5473"
             },
-            subtitle: "\u6BCF\u5929\u81EA\u52D5\u6AA2\u67E5\u4E00\u6B21\u7A0B\u5F0F\u78BC\u91CD\u8907\u3001\u7A0B\u5F0F\u78BC\u7570\u5473\u3001\u904E\u9577\u51FD\u5F0F\u7B49\uFF0C\u4E00\u9375\u61C9\u7528\u63A8\u85A6\u91CD\u69CB\u65B9\u6848",
-            title: "\u6700\u4F73\u5316\u7A0B\u5F0F\u78BC\u7D50\u69CB\uFF0C\u6D88\u9664\u6280\u8853\u50B5\u52D9"
+            subtitle: "\u67E5\u91CD\u8907\u7A0B\u5F0F\u78BC\u8207\u58DE\u5473\u9053\uFF0C\u4E00\u9375\u5957\u7528\u63A8\u85A6\u65B9\u6848",
+            title: "\u6D88\u9664\u7A0B\u5F0F\u78BC\u7570\u5473"
           },
           smell: {
             callbackHell: "\u56DE\u64A5\u5730\u7344",
@@ -8389,6 +8452,10 @@ var init_zh_Hant = __esm({
           },
           empty: {
             feature: {
+              gate: {
+                title: "\u9580\u7981\u7D50\u8AD6",
+                desc: "\u5F59\u7E3D\u63D0\u4EA4 / \u63A8\u9001 / CI \u9580\u7981\u7D50\u8AD6\uFF0C\u770B\u6E05\u662F\u5426\u53EF\u653E\u884C"
+              },
               module: {
                 title: "\u6A21\u7D44\u7D1A\u8A55\u5206",
                 desc: "\u4F9D\u5C08\u6848\u8F2A\u5ED3\u62C6\u5206\u5230\u5404\u6A21\u7D44\uFF0C\u5206\u5225\u7D66\u51FA\u5065\u5EB7\u5F97\u5206"
@@ -8402,8 +8469,8 @@ var init_zh_Hant = __esm({
                 title: "\u8DA8\u52E2\u5C0D\u6BD4"
               }
             },
-            subtitle: "\u5C1A\u7121\u8A55\u5206\u5831\u544A \u2014\u2014 \u57F7\u884C\u4E00\u6B21\u5C08\u6848\u9AD4\u6AA2\uFF0C\u9019\u88E1\u6703\u6C89\u6FB1\u6BCF\u6B21\u7684\u5065\u5EB7\u5206\u8207\u8DA8\u52E2",
-            title: "\u591A\u7DAD\u5EA6\u5206\u6790\u5831\u544A\uFF0C\u6C7A\u7B56\u66F4\u6709\u4F9D\u64DA"
+            subtitle: "\u5C1A\u7121\u5831\u544A\uFF0C\u8DD1\u4E00\u6B21\u9AD4\u6AA2\u5F8C\u5728\u9019\u88E1\u770B\u8DA8\u52E2",
+            title: "\u770B\u6E05\u54C1\u8CEA\u8DA8\u52E2"
           },
           generate: "\u5F59\u7E3D\u751F\u6210\u5831\u544A",
           generating: "\u7522\u751F\u4E2D...",
@@ -8469,8 +8536,8 @@ var init_zh_Hant = __esm({
           copyAllPrompt: "{{count}} \u9805\u9700\u8655\u7406\uFF0C\u53EF\u4E00\u9375\u8907\u88FD\u5168\u90E8\u5230 AI \u4FEE\u5FA9",
           done: "\u5B89\u5168\u6AA2\u67E5\u5B8C\u6210",
           empty: {
-            subtitle: "\u591A\u5F15\u64CE\u6DF1\u5EA6\u6383\u63CF\u6F0F\u6D1E\u8207\u60E1\u610F\u7A0B\u5F0F\u78BC\uFF0C\u7D50\u679C\u8207\u5DE5\u5177\u53EF\u7528\u6027\u4E00\u4F75\u5448\u73FE",
-            title: "\u6DF1\u5EA6\u6383\u63CF\u6F0F\u6D1E\uFF0C\u4FEE\u5FA9\u5B89\u5168\u96B1\u60A3"
+            subtitle: "\u591A\u5F15\u64CE\u6383\u63CF\u6F0F\u6D1E\u3001\u60E1\u610F\u7A0B\u5F0F\u78BC\u8207\u786C\u7DE8\u78BC\u5BC6\u9470",
+            title: "\u6383\u6E05\u5B89\u5168\u96B1\u60A3"
           },
           feature: {
             dependency: {
@@ -8577,10 +8644,10 @@ var init_zh_Hant = __esm({
               desc: "\u6A94\u6848\u8B8A\u66F4 / \u65E5\u8A8C / \u57F7\u884C\u884C\u7A0B\uFF0C\u4F9D\u5C08\u6848\u81EA\u52D5\u5075\u6E2C",
               title: "\u4E09\u6E90\u76E3\u63A7"
             },
-            subtitleIdle: "\u7576\u524D\u76E3\u63A7 0 \u500B\u6A94\u6848\uFF0C\u9EDE\u9078\u4E0B\u65B9\u6309\u9215\u555F\u52D5",
-            subtitleMonitoring: "\u76E3\u63A7\u4E2D\uFF08\u81EA\u52D5\uFF0C7\xD724\uFF09\u2014\u2014\u6B63\u5728\u5B88\u8B77\u7576\u524D\u5C08\u6848",
-            titleIdle: "24\u5C0F\u6642\u7121\u9593\u65B7\u76E3\u63A7\uFF0C\u7570\u5E38\u7121\u6240\u9041\u5F62",
-            titleMonitoring: "\u76E3\u63A7\u5DF2\u555F\u52D5\uFF0C\u7570\u5E38\u7121\u6240\u9041\u5F62"
+            subtitleIdle: "\u9EDE\u64CA\u4E0B\u65B9\u6309\u9215\uFF0C\u958B\u59CB\u5B88\u8B77\u76EE\u524D\u5C08\u6848",
+            subtitleMonitoring: "7\xD724 \u5B88\u8B77\u6A94\u6848\u3001\u65E5\u8A8C\u8207\u7A0B\u5E8F\u7570\u5E38",
+            titleIdle: "\u76E3\u63A7\u672A\u555F\u52D5",
+            titleMonitoring: "\u76E3\u63A7\u57F7\u884C\u4E2D"
           },
           source: {
             backend: "\u5F8C\u7AEF",
@@ -8634,8 +8701,8 @@ var init_zh_Hant = __esm({
           },
           empty: {
             start: "\u958B\u59CB\u76E4\u9EDE",
-            subtitle: "\u5206\u6790\u6383\u63CF\u554F\u984C\u8207\u6A21\u7D44\u71B1\u5EA6\uFF0C\u4F30\u7B97\u5229\u606F\u8207\u672C\u91D1\uFF0C\u6309 ROI \u6392\u5E8F\u7D66\u51FA\u511F\u9084\u5EFA\u8B70",
-            title: "\u91CF\u5316\u6280\u8853\u50B5\uFF0C\u628A\u8A55\u5206\u8B8A\u6210\u884C\u52D5"
+            subtitle: "\u4F30\u7B97\u5229\u606F\u8207\u672C\u91D1\uFF0C\u4F9D ROI \u6392\u51FA\u511F\u9084\u9806\u5E8F",
+            title: "\u91CF\u5316\u6280\u8853\u50B5"
           },
           errorTitle: "\u76E4\u9EDE\u5931\u6557",
           factor: {
@@ -10104,8 +10171,8 @@ var init_en = __esm({
                 title: "Auto sync"
               }
             },
-            subtitle: "Keeps rollback-ready snapshots of project config and key files, on local and GitHub channels",
-            title: "Protect important config; your data never gets lost"
+            subtitle: "Rollback-ready snapshots of config and key files, local and on GitHub",
+            title: "Snapshot config any time"
           },
           noRecords: "No backup records yet",
           oneClickBackup: "One-click backup",
@@ -10181,8 +10248,8 @@ var init_en = __esm({
           ecosystem: "Ecosystem",
           empty: {
             start: "Start inventory",
-            subtitle: "Parses lockfiles and manifests, builds the dependency graph, and verifies integrity",
-            title: "Inventory dependencies, see the full picture"
+            subtitle: "Verifies lockfile integrity, licenses, and known vulnerabilities",
+            title: "Inventory dependency risks"
           },
           env: "Environment consistency",
           "env.actual": "Actual: {{value}}",
@@ -10339,8 +10406,8 @@ var init_en = __esm({
           dependencyHint: "Unused dependencies are not deleted automatically; remove them manually from package.json once you've confirmed they're unreferenced",
           done: "Garbage cleanup complete",
           empty: {
-            subtitle: "Scans for unused files, redundant dependencies, and dead code",
-            title: "Clear out useless files, lighten your project"
+            subtitle: "Finds unused files, build artifacts, and unused dependencies",
+            title: "Clear out project junk"
           },
           emptyList: "The project is clean; nothing to clean up",
           feature: {
@@ -10400,6 +10467,9 @@ var init_en = __esm({
           copiedAll: "Copied all {{count}} issues; paste them into AI to fix",
           copyAllPrompt: "{{count}} items need attention; copy them all to AI in one click to fix",
           duration: "Scan took {{duration}}ms",
+          empty: {
+            title: "Commit guard"
+          },
           falsePositiveCount: "{{count}} false positive reports",
           falsePositiveSubmitted: "False positive report submitted; it will be used to calibrate rules",
           feature: {
@@ -10424,7 +10494,7 @@ var init_en = __esm({
             subtitle: "Hook auto-trigger + manual scans persisted to DB",
             title: "Recent blocks"
           },
-          idleSubtitle: "Watches code changes in real time, auto-blocks at commit/push/CI checkpoints",
+          idleSubtitle: "Auto-blocks issues at commit, push, and CI checkpoints",
           lastBlockAt: "Last {{time}}",
           lastScan: "Last scan \xB7 {{time}}",
           level: {
@@ -10492,8 +10562,8 @@ var init_en = __esm({
           copyAllPrompt: "{{count}} items need attention; copy them all to AI in one click to fix",
           done: "Inspection complete",
           empty: {
-            subtitle: "Auto-inspects architecture and type safety daily; run a one-click checkup anytime",
-            title: "Check architecture and type safety"
+            subtitle: "Scans layer boundaries, type safety, and code style",
+            title: "Architecture & type check"
           },
           feature: {
             architecture: {
@@ -10584,8 +10654,8 @@ var init_en = __esm({
               title: "Timer optimization"
             },
             start: "Start check",
-            subtitle: "Scans for inefficient array traversal, repeated regex compilation, redundant allocations, and other performance issues",
-            title: "Detect runtime performance anti-patterns, optimize execution efficiency"
+            subtitle: "Detects inefficient loops, blocking IO, oversized bundles, and ReDoS",
+            title: "Find performance bottlenecks"
           },
           source: "Performance",
           suggestion: "Suggestion: {{suggestion}}",
@@ -10595,6 +10665,7 @@ var init_en = __esm({
         },
         refactor: {
           addProjectFirst: "Add a project on the dashboard first",
+          fileCount: "{{count}} files",
           groupedIssues: "Refactor issues (grouped by type)",
           groupsSummary: "{{groups}} types \xB7 {{total}} items",
           header: {
@@ -10628,8 +10699,8 @@ var init_en = __esm({
               desc: "Detects duplicate code, oversized functions, high cyclomatic complexity, and more",
               title: "Code smells"
             },
-            subtitle: "Daily checks for code duplication, smells, oversized functions, etc.; apply recommended refactorings in one click",
-            title: "Optimize code structure, eliminate technical debt"
+            subtitle: "Finds duplication and smells; applies recommended fixes in one click",
+            title: "Remove code smells"
           },
           smell: {
             callbackHell: "Callback Hell",
@@ -10709,6 +10780,10 @@ var init_en = __esm({
           },
           empty: {
             feature: {
+              gate: {
+                title: "Gate verdicts",
+                desc: "Aggregates pre-commit, pre-push, and CI gate verdicts in one place"
+              },
               module: {
                 title: "Module scores",
                 desc: "Splits health scores per module based on the project profile"
@@ -10722,8 +10797,8 @@ var init_en = __esm({
                 title: "Trend comparison"
               }
             },
-            subtitle: "No score reports yet \u2014 run a project inspection and every health score and trend lands here",
-            title: "Multi-dimension analysis reports, better decisions"
+            subtitle: "No reports yet; run an inspection and trends land here",
+            title: "See quality trends"
           },
           generate: "Summarize report",
           generating: "Generating...",
@@ -10867,8 +10942,8 @@ var init_en = __esm({
           copyAllPrompt: "{{count}} items need attention; copy them all to AI in one click to fix",
           done: "Security check complete",
           empty: {
-            subtitle: "Multi-engine deep scan for vulnerabilities and malware; results are shown together with tool availability",
-            title: "Deep-scan vulnerabilities, fix security issues"
+            subtitle: "Multi-engine scan for vulnerabilities, malware, and hardcoded secrets",
+            title: "Clear security issues"
           },
           feature: {
             dependency: {
@@ -10975,10 +11050,10 @@ var init_en = __esm({
               desc: "File changes, logs and processes \u2014 auto-detected per project",
               title: "Three monitor sources"
             },
-            subtitleIdle: "Currently monitoring 0 files; click the button below to start",
-            subtitleMonitoring: "Monitoring (automatic, 7\xD724) \u2014 guarding the current project",
-            titleIdle: "24/7 uninterrupted monitoring, nothing escapes",
-            titleMonitoring: "Monitoring started, nothing escapes"
+            subtitleIdle: "Click the button below to start guarding this project",
+            subtitleMonitoring: "Guards files, logs, and processes 24/7",
+            titleIdle: "Monitoring off",
+            titleMonitoring: "Monitoring on"
           },
           source: {
             backend: "Backend",
@@ -11041,8 +11116,8 @@ var init_en = __esm({
           },
           empty: {
             start: "Start inventory",
-            subtitle: "Analyzes scan issues and module hotness, estimates interest and principal, and ranks repayment suggestions by ROI",
-            title: "Quantify tech debt, turn scores into action"
+            subtitle: "Estimates interest and principal; ranks payback by ROI",
+            title: "Quantify tech debt"
           },
           errorTitle: "Inventory failed",
           factor: {
@@ -12424,8 +12499,8 @@ var init_ko = __esm({
                 title: "\uC790\uB3D9 \uB3D9\uAE30\uD654"
               }
             },
-            subtitle: "\uD504\uB85C\uC81D\uD2B8 \uC124\uC815\uACFC \uC8FC\uC694 \uD30C\uC77C\uC758 \uB864\uBC31 \uAC00\uB2A5\uD55C \uC2A4\uB0C5\uC0F7\uC744 \uBCF4\uAD00\uD569\uB2C8\uB2E4 (\uB85C\uCEEC / GitHub \uC774\uC911 \uCC44\uB110)",
-            title: "\uC911\uC694\uD55C \uC124\uC815\uC744 \uBCF4\uD638\uD574 \uB370\uC774\uD130\uB97C \uC783\uC9C0 \uB9C8\uC138\uC694"
+            subtitle: "\uC124\uC815\uACFC \uC8FC\uC694 \uD30C\uC77C \uC2A4\uB0C5\uC0F7\uC744 \uB85C\uCEEC\uACFC GitHub\uC5D0 \uBCF4\uAD00",
+            title: "\uC124\uC815 \uC989\uC2DC \uBCF5\uC6D0"
           },
           noRecords: "\uBC31\uC5C5 \uAE30\uB85D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4",
           oneClickBackup: "\uC6D0\uD074\uB9AD \uBC31\uC5C5",
@@ -12501,8 +12576,8 @@ var init_ko = __esm({
           ecosystem: "\uC0DD\uD0DC\uACC4",
           empty: {
             start: "\uC810\uAC80 \uC2DC\uC791",
-            subtitle: "\uC7A0\uAE08 \uD30C\uC77C\uACFC \uC758\uC874\uC131 \uB9E4\uB2C8\uD398\uC2A4\uD2B8\uB97C \uBD84\uC11D\uD574 \uC758\uC874\uC131 \uADF8\uB798\uD504\uB97C \uADF8\uB9AC\uACE0 \uC644\uC804\uC131\uC744 \uAC80\uC99D\uD569\uB2C8\uB2E4",
-            title: "\uC758\uC874\uC131\uC744 \uC810\uAC80\uD574 \uADF8\uB798\uD504\uB97C \uD30C\uC545\uD558\uC138\uC694"
+            subtitle: "\uC7A0\uAE08 \uD30C\uC77C \uBB34\uACB0\uC131, \uB77C\uC774\uC120\uC2A4, \uC54C\uB824\uC9C4 \uCDE8\uC57D\uC810 \uAC80\uC99D",
+            title: "\uC758\uC874\uC131 \uC704\uD5D8 \uC810\uAC80"
           },
           env: "\uD658\uACBD \uC77C\uAD00\uC131",
           "env.actual": "\uC2E4\uC81C: {{value}}",
@@ -12659,8 +12734,8 @@ var init_ko = __esm({
           dependencyHint: "\uC0AC\uC6A9\uD558\uC9C0 \uC54A\uB294 \uC758\uC874\uC131\uC740 \uC790\uB3D9 \uC0AD\uC81C\uB418\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uCC38\uC870\uAC00 \uC5C6\uC74C\uC744 \uD655\uC778\uD55C \uB4A4 package.json\uC5D0\uC11C \uC218\uB3D9\uC73C\uB85C \uC81C\uAC70\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
           done: "\uC4F0\uB808\uAE30 \uC815\uB9AC \uC644\uB8CC",
           empty: {
-            subtitle: "\uC0AC\uC6A9\uD558\uC9C0 \uC54A\uB294 \uD30C\uC77C, \uC911\uBCF5 \uC758\uC874\uC131, \uC8FD\uC740 \uCF54\uB4DC \uC2A4\uCE94",
-            title: "\uC4F8\uBAA8\uC5C6\uB294 \uD30C\uC77C\uC744 \uC815\uB9AC\uD574 \uD504\uB85C\uC81D\uD2B8 \uBD80\uB2F4\uC744 \uC904\uC774\uC138\uC694"
+            subtitle: "\uC0AC\uC6A9\uD558\uC9C0 \uC54A\uB294 \uD30C\uC77C, \uBE4C\uB4DC \uC0B0\uCD9C\uBB3C, \uBBF8\uC0AC\uC6A9 \uC758\uC874\uC131 \uD0D0\uC9C0",
+            title: "\uD504\uB85C\uC81D\uD2B8 \uCC0C\uAEBC\uAE30 \uC815\uB9AC"
           },
           emptyList: "\uD504\uB85C\uC81D\uD2B8\uAC00 \uAE68\uB057\uD569\uB2C8\uB2E4. \uC815\uB9AC\uD560 \uC4F0\uB808\uAE30\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4",
           feature: {
@@ -12720,6 +12795,9 @@ var init_ko = __esm({
           copiedAll: "\uBB38\uC81C {{count}}\uAC74\uC774 \uBAA8\uB450 \uBCF5\uC0AC\uB418\uC5C8\uC2B5\uB2C8\uB2E4. AI\uC5D0 \uBD99\uC5EC\uB123\uC5B4 \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
           copyAllPrompt: "\uCC98\uB9AC\uD560 \uD56D\uBAA9 {{count}}\uAC1C. \uC804\uCCB4\uB97C \uD55C \uBC88\uC5D0 \uBCF5\uC0AC\uD574 AI\uB85C \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
           duration: "\uC2A4\uCE94 \uC18C\uC694 \uC2DC\uAC04 {{duration}}ms",
+          empty: {
+            title: "\uCEE4\uBC0B \uC9C0\uD0A4\uAE30"
+          },
           falsePositiveCount: "\uC624\uD0D0 \uD53C\uB4DC\uBC31 {{count}}\uAC74",
           falsePositiveSubmitted: "\uC624\uD0D0 \uD53C\uB4DC\uBC31\uC774 \uC81C\uCD9C\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uADDC\uCE59 \uBCF4\uC815\uC5D0 \uC0AC\uC6A9\uB429\uB2C8\uB2E4",
           feature: {
@@ -12744,7 +12822,7 @@ var init_ko = __esm({
             subtitle: "hook \uC790\uB3D9 \uD2B8\uB9AC\uAC70 + \uC218\uB3D9 \uC2A4\uCE94 \uC800\uC7A5",
             title: "\uCD5C\uADFC \uCC28\uB2E8 \uAE30\uB85D"
           },
-          idleSubtitle: "\uCF54\uB4DC \uBCC0\uACBD\uC744 \uC2E4\uC2DC\uAC04 \uBCF4\uD638\uD558\uBA70 \uCEE4\uBC0B/\uD478\uC2DC/CI \uB2E8\uACC4\uC5D0\uC11C \uC790\uB3D9 \uCC28\uB2E8",
+          idleSubtitle: "\uCEE4\uBC0B\xB7\uD478\uC2DC\xB7CI \uC138 \uB2E8\uACC4\uC5D0\uC11C \uC790\uB3D9 \uCC28\uB2E8",
           lastBlockAt: "\uCD5C\uADFC {{time}}",
           lastScan: "\uB9C8\uC9C0\uB9C9 \uC2A4\uCE94 \xB7 {{time}}",
           level: {
@@ -12812,8 +12890,8 @@ var init_ko = __esm({
           copyAllPrompt: "\uCC98\uB9AC\uD560 \uD56D\uBAA9 {{count}}\uAC1C. \uC804\uCCB4\uB97C \uD55C \uBC88\uC5D0 \uBCF5\uC0AC\uD574 AI\uB85C \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
           done: "\uC810\uAC80 \uC644\uB8CC",
           empty: {
-            subtitle: "\uB9E4\uC77C \uC544\uD0A4\uD14D\uCC98 \uADDC\uBC94\uACFC \uD0C0\uC785 \uC548\uC804\uC131\uC744 \uC790\uB3D9 \uC810\uAC80\uD569\uB2C8\uB2E4. \uC6D0\uD074\uB9AD \uC810\uAC80\uC73C\uB85C\uB3C4 \uC2E4\uD589 \uAC00\uB2A5",
-            title: "\uC544\uD0A4\uD14D\uCC98\uC640 \uD0C0\uC785 \uC548\uC804\uC131 \uAC80\uC0AC"
+            subtitle: "\uACC4\uCE35 \uC758\uC874\uC131, \uD0C0\uC785 \uC548\uC804\uC131, \uCF54\uB4DC \uADDC\uBC94\uC744 \uC810\uAC80",
+            title: "\uC544\uD0A4\uD14D\uCC98\uC640 \uD0C0\uC785 \uC810\uAC80"
           },
           feature: {
             architecture: {
@@ -12904,8 +12982,8 @@ var init_ko = __esm({
               title: "\uD0C0\uC774\uBA38 \uCD5C\uC801\uD654"
             },
             start: "\uAC10\uC9C0 \uC2DC\uC791",
-            subtitle: "\uBE44\uD6A8\uC728\uC801\uC778 \uBC30\uC5F4 \uC21C\uD68C, \uC815\uADDC\uC2DD \uBC18\uBCF5 \uCEF4\uD30C\uC77C, \uC911\uBCF5 \uD560\uB2F9 \uB4F1 \uC131\uB2A5 \uBB38\uC81C \uC2A4\uCE94",
-            title: "\uB7F0\uD0C0\uC784 \uC131\uB2A5 \uC548\uD2F0\uD328\uD134\uC744 \uAC10\uC9C0\uD574 \uC2E4\uD589 \uD6A8\uC728\uC744 \uCD5C\uC801\uD654\uD558\uC138\uC694"
+            subtitle: "\uBE44\uD6A8\uC728 \uB8E8\uD504, \uBE14\uB85C\uD0B9 IO, \uC6A9\uB7C9 \uCD08\uACFC, ReDoS \uAC10\uC9C0",
+            title: "\uC131\uB2A5 \uBCD1\uBAA9 \uCC3E\uAE30"
           },
           source: "\uC131\uB2A5",
           suggestion: "\uC81C\uC548: {{suggestion}}",
@@ -12915,6 +12993,7 @@ var init_ko = __esm({
         },
         refactor: {
           addProjectFirst: "\uBA3C\uC800 \uB300\uC2DC\uBCF4\uB4DC\uC5D0\uC11C \uD504\uB85C\uC81D\uD2B8\uB97C \uCD94\uAC00\uD558\uC138\uC694",
+          fileCount: "{{count}}\uAC1C \uD30C\uC77C",
           groupedIssues: "\uB9AC\uD329\uD1A0\uB9C1 \uBB38\uC81C (\uC720\uD615\uBCC4 \uADF8\uB8F9)",
           groupsSummary: "\uC720\uD615 {{groups}}\uAC1C \xB7 {{total}}\uACF3",
           header: {
@@ -12948,8 +13027,8 @@ var init_ko = __esm({
               desc: "\uC911\uBCF5 \uCF54\uB4DC, \uACFC\uB3C4\uD558\uAC8C \uAE34 \uD568\uC218, \uB192\uC740 \uC21C\uD658 \uBCF5\uC7A1\uB3C4 \uB4F1 \uBB38\uC81C \uAC10\uC9C0",
               title: "\uCF54\uB4DC \uC545\uCDE8"
             },
-            subtitle: "\uB9E4\uC77C 1\uD68C \uCF54\uB4DC \uC911\uBCF5, \uCF54\uB4DC \uC545\uCDE8, \uACFC\uB3C4\uD558\uAC8C \uAE34 \uD568\uC218 \uB4F1\uC744 \uC790\uB3D9 \uAC80\uC0AC\uD558\uACE0 \uAD8C\uC7A5 \uB9AC\uD329\uD1A0\uB9C1 \uBC29\uC548\uC744 \uC6D0\uD074\uB9AD \uC801\uC6A9",
-            title: "\uCF54\uB4DC \uAD6C\uC870\uB97C \uCD5C\uC801\uD654\uD574 \uAE30\uC220 \uBD80\uCC44\uB97C \uC81C\uAC70\uD558\uC138\uC694"
+            subtitle: "\uC911\uBCF5\uACFC \uC545\uCDE8\uB97C \uCC3E\uC544 \uAD8C\uC7A5 \uC218\uC815\uC744 \uC6D0\uD074\uB9AD \uC801\uC6A9",
+            title: "\uCF54\uB4DC \uC545\uCDE8 \uC81C\uAC70"
           },
           smell: {
             callbackHell: "\uCF5C\uBC31 \uC9C0\uC625",
@@ -13029,6 +13108,10 @@ var init_ko = __esm({
           },
           empty: {
             feature: {
+              gate: {
+                title: "\uAC8C\uC774\uD2B8 \uD310\uC815",
+                desc: "\uCEE4\uBC0B / \uD478\uC2DC / CI \uAC8C\uC774\uD2B8 \uD310\uC815\uC744 \uBAA8\uC544 \uD1B5\uACFC \uC5EC\uBD80\uB97C \uD55C\uB208\uC5D0 \uD655\uC778"
+              },
               module: {
                 title: "\uBAA8\uB4C8\uBCC4 \uC810\uC218",
                 desc: "\uD504\uB85C\uC81D\uD2B8 \uD504\uB85C\uD30C\uC77C\uC5D0 \uB530\uB77C \uAC01 \uBAA8\uB4C8\uB85C \uB098\uB204\uC5B4 \uC810\uC218\uB97C \uC0B0\uCD9C"
@@ -13042,8 +13125,8 @@ var init_ko = __esm({
                 title: "\uCD94\uC138 \uBE44\uAD50"
               }
             },
-            subtitle: "\uC544\uC9C1 \uC810\uC218 \uB9AC\uD3EC\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uD504\uB85C\uC81D\uD2B8 \uAC80\uC9C4\uC744 \uC2E4\uD589\uD558\uBA74 \uB9E4\uBC88\uC758 \uAC74\uAC15 \uC810\uC218\uC640 \uCD94\uC138\uAC00 \uC5EC\uAE30\uC5D0 \uC313\uC785\uB2C8\uB2E4",
-            title: "\uB2E4\uCC28\uC6D0 \uBD84\uC11D \uBCF4\uACE0\uC11C\uB85C \uB354 \uADFC\uAC70 \uC788\uB294 \uC758\uC0AC\uACB0\uC815\uC744 \uD558\uC138\uC694"
+            subtitle: "\uC544\uC9C1 \uB9AC\uD3EC\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uC810\uAC80\uC744 \uC2E4\uD589\uD558\uBA74 \uCD94\uC138\uAC00 \uC5EC\uAE30\uC5D0 \uC313\uC785\uB2C8\uB2E4",
+            title: "\uD488\uC9C8 \uCD94\uC138 \uBCF4\uAE30"
           },
           generate: "\uBCF4\uACE0\uC11C \uC9D1\uACC4",
           generating: "\uC0DD\uC131 \uC911...",
@@ -13109,8 +13192,8 @@ var init_ko = __esm({
           copyAllPrompt: "\uCC98\uB9AC\uD560 \uD56D\uBAA9 {{count}}\uAC1C. \uC804\uCCB4\uB97C \uD55C \uBC88\uC5D0 \uBCF5\uC0AC\uD574 AI\uB85C \uC218\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4",
           done: "\uBCF4\uC548 \uAC80\uC0AC \uC644\uB8CC",
           empty: {
-            subtitle: "\uBA40\uD2F0 \uC5D4\uC9C4\uC73C\uB85C \uCDE8\uC57D\uC810\uACFC \uC545\uC131 \uCF54\uB4DC\uB97C \uC2EC\uCE35 \uC2A4\uCE94\uD558\uBA70, \uACB0\uACFC\uB294 \uB3C4\uAD6C \uAC00\uC6A9\uC131\uACFC \uD568\uAED8 \uD45C\uC2DC\uB429\uB2C8\uB2E4",
-            title: "\uCDE8\uC57D\uC810\uC744 \uC2EC\uCE35 \uC2A4\uCE94\uD558\uACE0 \uBCF4\uC548 \uC704\uD5D8\uC744 \uC218\uC815\uD558\uC138\uC694"
+            subtitle: "\uCDE8\uC57D\uC810\xB7\uC545\uC131 \uCF54\uB4DC\xB7\uD558\uB4DC\uCF54\uB529\uB41C \uBE44\uBC00\uC744 \uBA40\uD2F0 \uC5D4\uC9C4\uC73C\uB85C \uC2A4\uCE94",
+            title: "\uBCF4\uC548 \uC704\uD5D8\uC744 \uC815\uB9AC"
           },
           feature: {
             dependency: {
@@ -13217,10 +13300,10 @@ var init_ko = __esm({
               desc: "\uD30C\uC77C \uBCC0\uACBD\xB7\uB85C\uADF8\xB7\uD504\uB85C\uC138\uC2A4\uB97C \uD504\uB85C\uC81D\uD2B8\uBCC4\uB85C \uC790\uB3D9 \uAC10\uC9C0",
               title: "\uC138 \uAC00\uC9C0 \uBAA8\uB2C8\uD130 \uC18C\uC2A4"
             },
-            subtitleIdle: "\uD604\uC7AC 0\uAC1C \uD30C\uC77C\uC744 \uBAA8\uB2C8\uD130\uB9C1 \uC911\uC785\uB2C8\uB2E4. \uC544\uB798 \uBC84\uD2BC\uC744 \uB20C\uB7EC \uC2DC\uC791\uD558\uC138\uC694",
-            subtitleMonitoring: "\uBAA8\uB2C8\uD130\uB9C1 \uC911 (\uC790\uB3D9, 24/7) \u2014 \uD604\uC7AC \uD504\uB85C\uC81D\uD2B8\uB97C \uBCF4\uD638\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4",
-            titleIdle: "24\uC2DC\uAC04 \uBB34\uC911\uB2E8 \uBAA8\uB2C8\uD130\uB9C1\uC73C\uB85C \uC774\uC0C1\uC744 \uB193\uCE58\uC9C0 \uB9C8\uC138\uC694",
-            titleMonitoring: "\uBAA8\uB2C8\uD130\uB9C1\uC774 \uC2DC\uC791\uB418\uC5C8\uC2B5\uB2C8\uB2E4. \uC774\uC0C1\uC744 \uB193\uCE58\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4"
+            subtitleIdle: "\uC544\uB798 \uBC84\uD2BC\uC744 \uB20C\uB7EC \uC774 \uD504\uB85C\uC81D\uD2B8 \uAC10\uC2DC\uB97C \uC2DC\uC791\uD558\uC138\uC694",
+            subtitleMonitoring: "\uD30C\uC77C\xB7\uB85C\uADF8\xB7\uD504\uB85C\uC138\uC2A4\uB97C 24/7 \uAC10\uC2DC\uD569\uB2C8\uB2E4",
+            titleIdle: "\uBAA8\uB2C8\uD130\uB9C1 \uC911\uC9C0\uB428",
+            titleMonitoring: "\uBAA8\uB2C8\uD130\uB9C1 \uC2E4\uD589 \uC911"
           },
           source: {
             backend: "\uBC31\uC5D4\uB4DC",
@@ -13274,8 +13357,8 @@ var init_ko = __esm({
           },
           empty: {
             start: "\uC810\uAC80 \uC2DC\uC791",
-            subtitle: "\uC2A4\uCE94 \uBB38\uC81C\uC640 \uBAA8\uB4C8 \uD65C\uB3D9\uC131\uC744 \uBD84\uC11D\uD574 \uC774\uC790\uC640 \uC6D0\uAE08\uC744 \uCD94\uC815\uD558\uACE0 ROI \uC21C\uC73C\uB85C \uC0C1\uD658 \uC81C\uC548\uC744 \uC81C\uACF5\uD569\uB2C8\uB2E4",
-            title: "\uAE30\uC220 \uBD80\uCC44\uB97C \uC815\uB7C9\uD654\uD574 \uC810\uC218\uB97C \uD589\uB3D9\uC73C\uB85C \uBC14\uAFB8\uC138\uC694"
+            subtitle: "\uC774\uC790\uC640 \uC6D0\uAE08\uC744 \uCD94\uC815\uD574 ROI \uC21C\uC73C\uB85C \uC0C1\uD658 \uC21C\uC11C \uC81C\uC2DC",
+            title: "\uAE30\uC220 \uBD80\uCC44 \uC815\uB7C9\uD654"
           },
           errorTitle: "\uC810\uAC80 \uC2E4\uD328",
           factor: {
@@ -14744,8 +14827,8 @@ var init_ja = __esm({
                 title: "\u81EA\u52D5\u540C\u671F"
               }
             },
-            subtitle: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u8A2D\u5B9A\u3068\u91CD\u8981\u30D5\u30A1\u30A4\u30EB\u306E\u30ED\u30FC\u30EB\u30D0\u30C3\u30AF\u53EF\u80FD\u306A\u30B9\u30CA\u30C3\u30D7\u30B7\u30E7\u30C3\u30C8\u3092\u4FDD\u6301\uFF08\u30ED\u30FC\u30AB\u30EB / GitHub \u306E\u4E8C\u7D4C\u8DEF\uFF09",
-            title: "\u91CD\u8981\u306A\u8A2D\u5B9A\u3092\u4FDD\u8B77\u3057\u3001\u30C7\u30FC\u30BF\u3092\u5931\u308F\u306A\u3044"
+            subtitle: "\u8A2D\u5B9A\u3068\u91CD\u8981\u30D5\u30A1\u30A4\u30EB\u306E\u30B9\u30CA\u30C3\u30D7\u30B7\u30E7\u30C3\u30C8\u3092\u30ED\u30FC\u30AB\u30EB\u3068 GitHub \u306B\u4FDD\u5B58",
+            title: "\u8A2D\u5B9A\u3092\u3044\u3064\u3067\u3082\u5FA9\u5143"
           },
           noRecords: "\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7\u8A18\u9332\u306F\u3042\u308A\u307E\u305B\u3093",
           oneClickBackup: "\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u30D0\u30C3\u30AF\u30A2\u30C3\u30D7",
@@ -14821,8 +14904,8 @@ var init_ja = __esm({
           ecosystem: "\u30A8\u30B3\u30B7\u30B9\u30C6\u30E0",
           empty: {
             start: "\u68DA\u5378\u3057\u3092\u958B\u59CB",
-            subtitle: "\u30ED\u30C3\u30AF\u30D5\u30A1\u30A4\u30EB\u3068\u4F9D\u5B58\u95A2\u4FC2\u30DE\u30CB\u30D5\u30A7\u30B9\u30C8\u3092\u89E3\u6790\u3057\u3001\u4F9D\u5B58\u95A2\u4FC2\u30B0\u30E9\u30D5\u3092\u4F5C\u6210\u3057\u3066\u5B8C\u5168\u6027\u3092\u691C\u8A3C\u3057\u307E\u3059",
-            title: "\u4F9D\u5B58\u95A2\u4FC2\u3092\u68DA\u5378\u3057\u3057\u3001\u30B0\u30E9\u30D5\u3092\u628A\u63E1\u3059\u308B"
+            subtitle: "\u30ED\u30C3\u30AF\u30D5\u30A1\u30A4\u30EB\u306E\u5B8C\u5168\u6027\u3001\u30E9\u30A4\u30BB\u30F3\u30B9\u3001\u65E2\u77E5\u306E\u8106\u5F31\u6027\u3092\u691C\u8A3C",
+            title: "\u4F9D\u5B58\u95A2\u4FC2\u306E\u30EA\u30B9\u30AF\u3092\u68DA\u5378\u3057"
           },
           env: "\u74B0\u5883\u306E\u4E00\u8CAB\u6027",
           "env.actual": "\u5B9F\u969B\uFF1A{{value}}",
@@ -14979,8 +15062,8 @@ var init_ja = __esm({
           dependencyHint: "\u672A\u4F7F\u7528\u306E\u4F9D\u5B58\u95A2\u4FC2\u306F\u81EA\u52D5\u524A\u9664\u3055\u308C\u307E\u305B\u3093\u3002\u53C2\u7167\u304C\u306A\u3044\u3053\u3068\u3092\u78BA\u8A8D\u3057\u305F\u4E0A\u3067 package.json \u304B\u3089\u624B\u52D5\u3067\u524A\u9664\u3067\u304D\u307E\u3059",
           done: "\u30B4\u30DF\u6E05\u6383\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F",
           empty: {
-            subtitle: "\u672A\u4F7F\u7528\u30D5\u30A1\u30A4\u30EB\u3001\u5197\u9577\u306A\u4F9D\u5B58\u95A2\u4FC2\u3001\u30C7\u30C3\u30C9\u30B3\u30FC\u30C9\u3092\u30B9\u30AD\u30E3\u30F3",
-            title: "\u4E0D\u8981\u306A\u30D5\u30A1\u30A4\u30EB\u3092\u30AF\u30EA\u30FC\u30F3\u30A2\u30C3\u30D7\u3057\u3001\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u3092\u8EFD\u304F\u3059\u308B"
+            subtitle: "\u672A\u4F7F\u7528\u30D5\u30A1\u30A4\u30EB\u3001\u30D3\u30EB\u30C9\u6210\u679C\u7269\u3001\u672A\u4F7F\u7528\u4F9D\u5B58\u3092\u691C\u51FA",
+            title: "\u4E0D\u8981\u306A\u30D5\u30A1\u30A4\u30EB\u3092\u6574\u7406"
           },
           emptyList: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306F\u304D\u308C\u3044\u3067\u3001\u30AF\u30EA\u30FC\u30F3\u30A2\u30C3\u30D7\u5BFE\u8C61\u306E\u30B4\u30DF\u306F\u3042\u308A\u307E\u305B\u3093",
           feature: {
@@ -15040,6 +15123,9 @@ var init_ja = __esm({
           copiedAll: "\u5168 {{count}} \u4EF6\u306E\u554F\u984C\u3092\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F\u3002AI \u306B\u8CBC\u308A\u4ED8\u3051\u3066\u4FEE\u6B63\u3067\u304D\u307E\u3059",
           copyAllPrompt: "{{count}} \u9805\u76EE\u306E\u51E6\u7406\u304C\u5FC5\u8981\u3067\u3059\u3002\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u3067\u3059\u3079\u3066\u30B3\u30D4\u30FC\u3057\u3066 AI \u306B\u4FEE\u6B63\u3055\u305B\u3089\u308C\u307E\u3059",
           duration: "\u30B9\u30AD\u30E3\u30F3\u6240\u8981\u6642\u9593 {{duration}}ms",
+          empty: {
+            title: "\u30B3\u30DF\u30C3\u30C8\u3092\u5B88\u308B"
+          },
           falsePositiveCount: "\u8AA4\u691C\u51FA\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF {{count}} \u4EF6",
           falsePositiveSubmitted: "\u8AA4\u691C\u51FA\u30D5\u30A3\u30FC\u30C9\u30D0\u30C3\u30AF\u3092\u9001\u4FE1\u3057\u307E\u3057\u305F\u3002\u30EB\u30FC\u30EB\u306E\u8ABF\u6574\u306B\u4F7F\u7528\u3055\u308C\u307E\u3059",
           feature: {
@@ -15064,7 +15150,7 @@ var init_ja = __esm({
             subtitle: "hook \u81EA\u52D5\u30C8\u30EA\u30AC\u30FC + \u624B\u52D5\u30B9\u30AD\u30E3\u30F3\u3092\u8A18\u9332",
             title: "\u6700\u8FD1\u306E\u30D6\u30ED\u30C3\u30AF\u8A18\u9332"
           },
-          idleSubtitle: "\u30B3\u30FC\u30C9\u306E\u5909\u66F4\u3092\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u3067\u30AC\u30FC\u30C9\u3057\u3001\u30B3\u30DF\u30C3\u30C8/\u30D7\u30C3\u30B7\u30E5/CI \u306E\u95A2\u6240\u3067\u81EA\u52D5\u30D6\u30ED\u30C3\u30AF",
+          idleSubtitle: "\u30B3\u30DF\u30C3\u30C8\u30FB\u30D7\u30C3\u30B7\u30E5\u30FBCI \u306E 3 \u95A2\u6240\u3067\u81EA\u52D5\u30D6\u30ED\u30C3\u30AF",
           lastBlockAt: "\u76F4\u8FD1 {{time}}",
           lastScan: "\u524D\u56DE\u30B9\u30AD\u30E3\u30F3 \xB7 {{time}}",
           level: {
@@ -15132,8 +15218,8 @@ var init_ja = __esm({
           copyAllPrompt: "{{count}} \u9805\u76EE\u306E\u51E6\u7406\u304C\u5FC5\u8981\u3067\u3059\u3002\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u3067\u3059\u3079\u3066\u30B3\u30D4\u30FC\u3057\u3066 AI \u306B\u4FEE\u6B63\u3055\u305B\u3089\u308C\u307E\u3059",
           done: "\u5DE1\u56DE\u5B8C\u4E86",
           empty: {
-            subtitle: "\u6BCE\u65E5\u30A2\u30FC\u30AD\u30C6\u30AF\u30C1\u30E3\u898F\u7BC4\u3068\u578B\u5B89\u5168\u6027\u3092\u81EA\u52D5\u5DE1\u56DE\u3002\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u5DE1\u56DE\u3067\u3082\u5B9F\u884C\u3067\u304D\u307E\u3059",
-            title: "\u30A2\u30FC\u30AD\u30C6\u30AF\u30C1\u30E3\u3068\u578B\u5B89\u5168\u6027\u3092\u30C1\u30A7\u30C3\u30AF"
+            subtitle: "\u5C64\u306E\u4F9D\u5B58\u95A2\u4FC2\u3001\u578B\u5B89\u5168\u6027\u3001\u30B3\u30FC\u30C9\u898F\u7D04\u3092\u70B9\u691C",
+            title: "\u30A2\u30FC\u30AD\u30C6\u30AF\u30C1\u30E3\u3068\u578B\u306E\u70B9\u691C"
           },
           feature: {
             architecture: {
@@ -15224,8 +15310,8 @@ var init_ja = __esm({
               title: "\u30BF\u30A4\u30DE\u30FC\u6700\u9069\u5316"
             },
             start: "\u691C\u51FA\u958B\u59CB",
-            subtitle: "\u975E\u52B9\u7387\u306A\u914D\u5217\u8D70\u67FB\u3001\u6B63\u898F\u8868\u73FE\u306E\u7E70\u308A\u8FD4\u3057\u30B3\u30F3\u30D1\u30A4\u30EB\u3001\u5197\u9577\u306A\u30A2\u30ED\u30B1\u30FC\u30B7\u30E7\u30F3\u306A\u3069\u306E\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u554F\u984C\u3092\u30B9\u30AD\u30E3\u30F3",
-            title: "\u5B9F\u884C\u6642\u306E\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u30A2\u30F3\u30C1\u30D1\u30BF\u30FC\u30F3\u3092\u691C\u51FA\u3057\u3001\u5B9F\u884C\u52B9\u7387\u3092\u6700\u9069\u5316"
+            subtitle: "\u975E\u52B9\u7387\u306A\u30EB\u30FC\u30D7\u3001\u30D6\u30ED\u30C3\u30AD\u30F3\u30B0 IO\u3001\u30B5\u30A4\u30BA\u8D85\u904E\u3001ReDoS \u3092\u691C\u51FA",
+            title: "\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9\u306E\u30DC\u30C8\u30EB\u30CD\u30C3\u30AF\u3092\u63A2\u3059"
           },
           source: "\u30D1\u30D5\u30A9\u30FC\u30DE\u30F3\u30B9",
           suggestion: "\u63D0\u6848: {{suggestion}}",
@@ -15235,6 +15321,7 @@ var init_ja = __esm({
         },
         refactor: {
           addProjectFirst: "\u5148\u306B\u30C0\u30C3\u30B7\u30E5\u30DC\u30FC\u30C9\u3067\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u3092\u8FFD\u52A0\u3057\u3066\u304F\u3060\u3055\u3044",
+          fileCount: "{{count}} \u30D5\u30A1\u30A4\u30EB",
           groupedIssues: "\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u554F\u984C\uFF08\u30BF\u30A4\u30D7\u5225\u30B0\u30EB\u30FC\u30D7\uFF09",
           groupsSummary: "{{groups}} \u7A2E\u985E \xB7 {{total}} \u7B87\u6240",
           header: {
@@ -15268,8 +15355,8 @@ var init_ja = __esm({
               desc: "\u91CD\u8907\u30B3\u30FC\u30C9\u3001\u9577\u3059\u304E\u308B\u95A2\u6570\u3001\u9AD8\u3044\u5FAA\u74B0\u7684\u8907\u96D1\u5EA6\u306A\u3069\u306E\u554F\u984C\u3092\u691C\u51FA",
               title: "\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB"
             },
-            subtitle: "\u6BCE\u65E5 1 \u56DE\u3001\u30B3\u30FC\u30C9\u91CD\u8907\u3001\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB\u3001\u9577\u3059\u304E\u308B\u95A2\u6570\u306A\u3069\u3092\u81EA\u52D5\u30C1\u30A7\u30C3\u30AF\u3057\u3001\u63A8\u5968\u3055\u308C\u308B\u30EA\u30D5\u30A1\u30AF\u30BF\u30EA\u30F3\u30B0\u6848\u3092\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u3067\u9069\u7528",
-            title: "\u30B3\u30FC\u30C9\u69CB\u9020\u3092\u6700\u9069\u5316\u3057\u3001\u6280\u8853\u8CA0\u50B5\u3092\u89E3\u6D88\u3059\u308B"
+            subtitle: "\u91CD\u8907\u3068\u30B9\u30E1\u30EB\u3092\u691C\u51FA\u3057\u3001\u63A8\u5968\u4FEE\u6B63\u3092\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u3067\u9069\u7528",
+            title: "\u30B3\u30FC\u30C9\u30B9\u30E1\u30EB\u3092\u89E3\u6D88"
           },
           smell: {
             callbackHell: "\u30B3\u30FC\u30EB\u30D0\u30C3\u30AF\u5730\u7344",
@@ -15349,6 +15436,10 @@ var init_ja = __esm({
           },
           empty: {
             feature: {
+              gate: {
+                title: "\u30B2\u30FC\u30C8\u5224\u5B9A",
+                desc: "\u30B3\u30DF\u30C3\u30C8 / \u30D7\u30C3\u30B7\u30E5 / CI \u30B2\u30FC\u30C8\u306E\u5224\u5B9A\u3092\u96C6\u7D04\u3057\u3001\u901A\u904E\u53EF\u5426\u3092\u4E00\u76EE\u3067\u78BA\u8A8D"
+              },
               module: {
                 title: "\u30E2\u30B8\u30E5\u30FC\u30EB\u5225\u30B9\u30B3\u30A2",
                 desc: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u30D7\u30ED\u30D5\u30A1\u30A4\u30EB\u306B\u57FA\u3065\u304D\u5404\u30E2\u30B8\u30E5\u30FC\u30EB\u3078\u5206\u5272\u3057\u3066\u63A1\u70B9"
@@ -15362,8 +15453,8 @@ var init_ja = __esm({
                 title: "\u30C8\u30EC\u30F3\u30C9\u6BD4\u8F03"
               }
             },
-            subtitle: "\u30B9\u30B3\u30A2\u30EC\u30DD\u30FC\u30C8\u306F\u307E\u3060\u3042\u308A\u307E\u305B\u3093 \u2014 \u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u691C\u67FB\u3092\u5B9F\u884C\u3059\u308B\u3068\u3001\u6BCE\u56DE\u306E\u30D8\u30EB\u30B9\u30B9\u30B3\u30A2\u3068\u63A8\u79FB\u304C\u3053\u3053\u306B\u84C4\u7A4D\u3055\u308C\u307E\u3059",
-            title: "\u591A\u6B21\u5143\u5206\u6790\u30EC\u30DD\u30FC\u30C8\u3067\u3001\u610F\u601D\u6C7A\u5B9A\u306E\u6839\u62E0\u306B"
+            subtitle: "\u30EC\u30DD\u30FC\u30C8\u306F\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002\u70B9\u691C\u3092\u5B9F\u884C\u3059\u308B\u3068\u63A8\u79FB\u304C\u3053\u3053\u306B\u8CAF\u307E\u308A\u307E\u3059",
+            title: "\u54C1\u8CEA\u306E\u63A8\u79FB\u3092\u898B\u308B"
           },
           generate: "\u30EC\u30DD\u30FC\u30C8\u3092\u96C6\u7D04",
           generating: "\u751F\u6210\u4E2D...",
@@ -15429,8 +15520,8 @@ var init_ja = __esm({
           copyAllPrompt: "{{count}} \u9805\u76EE\u306E\u51E6\u7406\u304C\u5FC5\u8981\u3067\u3059\u3002\u30EF\u30F3\u30AF\u30EA\u30C3\u30AF\u3067\u3059\u3079\u3066\u30B3\u30D4\u30FC\u3057\u3066 AI \u306B\u4FEE\u6B63\u3055\u305B\u3089\u308C\u307E\u3059",
           done: "\u30BB\u30AD\u30E5\u30EA\u30C6\u30A3\u30C1\u30A7\u30C3\u30AF\u304C\u5B8C\u4E86\u3057\u307E\u3057\u305F",
           empty: {
-            subtitle: "\u30DE\u30EB\u30C1\u30A8\u30F3\u30B8\u30F3\u3067\u8106\u5F31\u6027\u3068\u30DE\u30EB\u30A6\u30A7\u30A2\u3092\u6DF1\u304F\u30B9\u30AD\u30E3\u30F3\u3002\u7D50\u679C\u306F\u30C4\u30FC\u30EB\u306E\u5229\u7528\u53EF\u80FD\u72B6\u6CC1\u3068\u5408\u308F\u305B\u3066\u8868\u793A\u3057\u307E\u3059",
-            title: "\u8106\u5F31\u6027\u3092\u6DF1\u304F\u30B9\u30AD\u30E3\u30F3\u3057\u3001\u30BB\u30AD\u30E5\u30EA\u30C6\u30A3\u4E0A\u306E\u554F\u984C\u3092\u4FEE\u6B63\u3059\u308B"
+            subtitle: "\u8106\u5F31\u6027\u30FB\u30DE\u30EB\u30A6\u30A7\u30A2\u30FB\u30CF\u30FC\u30C9\u30B3\u30FC\u30C9\u3055\u308C\u305F\u79D8\u5BC6\u3092\u30DE\u30EB\u30C1\u30A8\u30F3\u30B8\u30F3\u3067\u30B9\u30AD\u30E3\u30F3",
+            title: "\u30BB\u30AD\u30E5\u30EA\u30C6\u30A3\u554F\u984C\u3092\u6D17\u3044\u51FA\u3059"
           },
           feature: {
             dependency: {
@@ -15537,10 +15628,10 @@ var init_ja = __esm({
               desc: "\u30D5\u30A1\u30A4\u30EB\u5909\u66F4\u30FB\u30ED\u30B0\u30FB\u30D7\u30ED\u30BB\u30B9\u3092\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u3054\u3068\u306B\u81EA\u52D5\u691C\u51FA",
               title: "3\u3064\u306E\u76E3\u8996\u6E90"
             },
-            subtitleIdle: "\u73FE\u5728 0 \u500B\u306E\u30D5\u30A1\u30A4\u30EB\u3092\u76E3\u8996\u3057\u3066\u3044\u307E\u3059\u3002\u4E0B\u306E\u30DC\u30BF\u30F3\u3092\u30AF\u30EA\u30C3\u30AF\u3057\u3066\u958B\u59CB\u3057\u3066\u304F\u3060\u3055\u3044",
-            subtitleMonitoring: "\u76E3\u8996\u4E2D\uFF08\u81EA\u52D5\u30017\xD724\uFF09\u2014\u2014\u73FE\u5728\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u3092\u30AC\u30FC\u30C9\u3057\u3066\u3044\u307E\u3059",
-            titleIdle: "24 \u6642\u9593\u9014\u5207\u308C\u306E\u306A\u3044\u76E3\u8996\u3067\u3001\u7570\u5E38\u3092\u9003\u3055\u306A\u3044",
-            titleMonitoring: "\u76E3\u8996\u3092\u958B\u59CB\u3057\u307E\u3057\u305F\u3002\u7570\u5E38\u3092\u9003\u3057\u307E\u305B\u3093"
+            subtitleIdle: "\u4E0B\u306E\u30DC\u30BF\u30F3\u304B\u3089\u3001\u3053\u306E\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u306E\u76E3\u8996\u3092\u958B\u59CB",
+            subtitleMonitoring: "\u30D5\u30A1\u30A4\u30EB\u30FB\u30ED\u30B0\u30FB\u30D7\u30ED\u30BB\u30B9\u3092 24 \u6642\u9593 7 \u65E5\u898B\u5B88\u308A\u307E\u3059",
+            titleIdle: "\u76E3\u8996\u306F\u505C\u6B62\u4E2D",
+            titleMonitoring: "\u76E3\u8996\u3092\u5B9F\u884C\u4E2D"
           },
           source: {
             backend: "\u30D0\u30C3\u30AF\u30A8\u30F3\u30C9",
@@ -15594,8 +15685,8 @@ var init_ja = __esm({
           },
           empty: {
             start: "\u68DA\u5378\u3057\u3092\u958B\u59CB",
-            subtitle: "\u30B9\u30AD\u30E3\u30F3\u554F\u984C\u3068\u30E2\u30B8\u30E5\u30FC\u30EB\u306E\u30DB\u30C3\u30C8\u30CD\u30B9\u3092\u5206\u6790\u3057\u3001\u5229\u606F\u3068\u5143\u672C\u3092\u63A8\u5B9A\u3057\u3066\u3001ROI \u9806\u306B\u8FD4\u6E08\u306E\u63D0\u6848\u3092\u63D0\u793A",
-            title: "\u6280\u8853\u8CA0\u50B5\u3092\u5B9A\u91CF\u5316\u3057\u3001\u30B9\u30B3\u30A2\u3092\u30A2\u30AF\u30B7\u30E7\u30F3\u306B\u5909\u3048\u308B"
+            subtitle: "\u5229\u606F\u3068\u5143\u672C\u3092\u63A8\u5B9A\u3057\u3001ROI \u9806\u306B\u8FD4\u6E08\u306E\u9806\u756A\u3092\u63D0\u793A",
+            title: "\u6280\u8853\u8CA0\u50B5\u3092\u5B9A\u91CF\u5316"
           },
           errorTitle: "\u68DA\u5378\u3057\u306B\u5931\u6557\u3057\u307E\u3057\u305F",
           factor: {
@@ -17238,6 +17329,58 @@ var init_noise_dirs = __esm({
   }
 });
 
+// ../shared/src/node-builtins.ts
+var NODE_BUILTIN_MODULES;
+var init_node_builtins = __esm({
+  "../shared/src/node-builtins.ts"() {
+    "use strict";
+    NODE_BUILTIN_MODULES = /* @__PURE__ */ new Set([
+      "assert",
+      "async_hooks",
+      "buffer",
+      "child_process",
+      "cluster",
+      "console",
+      "constants",
+      "crypto",
+      "dgram",
+      "diagnostics_channel",
+      "dns",
+      "domain",
+      "events",
+      "fs",
+      "http",
+      "http2",
+      "https",
+      "inspector",
+      "module",
+      "net",
+      "os",
+      "path",
+      "perf_hooks",
+      "process",
+      "punycode",
+      "querystring",
+      "readline",
+      "repl",
+      "stream",
+      "string_decoder",
+      "sys",
+      "timers",
+      "tls",
+      "trace_events",
+      "tty",
+      "url",
+      "util",
+      "v8",
+      "vm",
+      "wasi",
+      "worker_threads",
+      "zlib"
+    ]);
+  }
+});
+
 // ../shared/src/constant-time.ts
 function constantTimeEqual(actual, expected) {
   if (!actual || !expected) return false;
@@ -17933,6 +18076,7 @@ __export(src_exports, {
   HEALTH_SCORE_DIMENSIONS: () => HEALTH_SCORE_DIMENSIONS,
   INSPECT_SCOPE_DOMAINS: () => INSPECT_SCOPE_DOMAINS,
   MAX_LOG_FIELD_LENGTH: () => MAX_LOG_FIELD_LENGTH,
+  NODE_BUILTIN_MODULES: () => NODE_BUILTIN_MODULES,
   NOISE_DIRS: () => NOISE_DIRS,
   NOOP_EMITTER: () => NOOP_EMITTER,
   OWNERSHIP_CLAIMS: () => OWNERSHIP_CLAIMS,
@@ -18086,6 +18230,7 @@ var init_src2 = __esm({
     init_refactor_baseline_io();
     init_fs_safe();
     init_noise_dirs();
+    init_node_builtins();
     init_constant_time();
     init_text_utils();
     init_promise_timeout();
@@ -505120,7 +505265,7 @@ function usesNodeBuiltin(scan) {
   for (const specifier of scan.moduleSpecifiers) {
     if (specifier.startsWith("node:")) return true;
     const [root] = specifier.split("/");
-    if (root !== void 0 && NODE_BUILTINS2.has(root)) return true;
+    if (root !== void 0 && NODE_BUILTIN_MODULES.has(root)) return true;
   }
   return false;
 }
@@ -505144,54 +505289,11 @@ function isExpressHandler(paramTypes) {
   if (first === void 0 || second === void 0) return false;
   return EXPRESS_REQUEST_PARAMS.has(first) && EXPRESS_RESPONSE_PARAMS.has(second);
 }
-var NODE_BUILTINS2, DOM_GLOBALS, ELECTRON_RENDERER_APIS, ONE_SHOT_SCOPES, NESTJS_REQUEST_INTERFACES, NESTJS_HANDLER_DECORATORS, EXPRESS_REQUEST_PARAMS, EXPRESS_RESPONSE_PARAMS;
+var DOM_GLOBALS, ELECTRON_RENDERER_APIS, ONE_SHOT_SCOPES, NESTJS_REQUEST_INTERFACES, NESTJS_HANDLER_DECORATORS, EXPRESS_REQUEST_PARAMS, EXPRESS_RESPONSE_PARAMS;
 var init_runtime_context = __esm({
   "../performance/src/adapters/runtime-context.ts"() {
     "use strict";
-    NODE_BUILTINS2 = /* @__PURE__ */ new Set([
-      "assert",
-      "async_hooks",
-      "buffer",
-      "child_process",
-      "cluster",
-      "console",
-      "constants",
-      "crypto",
-      "dgram",
-      "diagnostics_channel",
-      "dns",
-      "domain",
-      "events",
-      "fs",
-      "http",
-      "http2",
-      "https",
-      "inspector",
-      "module",
-      "net",
-      "os",
-      "path",
-      "perf_hooks",
-      "process",
-      "punycode",
-      "querystring",
-      "readline",
-      "repl",
-      "stream",
-      "string_decoder",
-      "sys",
-      "timers",
-      "tls",
-      "trace_events",
-      "tty",
-      "url",
-      "util",
-      "v8",
-      "vm",
-      "wasi",
-      "worker_threads",
-      "zlib"
-    ]);
+    init_src2();
     DOM_GLOBALS = /* @__PURE__ */ new Set([
       "window",
       "document",
@@ -512522,47 +512624,6 @@ function extractSpecifiers(line) {
   }
   return specs;
 }
-var NODE_BUILTINS = /* @__PURE__ */ new Set([
-  "assert",
-  "buffer",
-  "child_process",
-  "cluster",
-  "console",
-  "constants",
-  "crypto",
-  "dgram",
-  "diagnostics_channel",
-  "dns",
-  "domain",
-  "events",
-  "fs",
-  "http",
-  "http2",
-  "https",
-  "module",
-  "net",
-  "os",
-  "path",
-  "perf_hooks",
-  "process",
-  "punycode",
-  "querystring",
-  "readline",
-  "repl",
-  "stream",
-  "string_decoder",
-  "timers",
-  "tls",
-  "trace_events",
-  "tty",
-  "url",
-  "util",
-  "v8",
-  "vm",
-  "wasi",
-  "worker_threads",
-  "zlib"
-]);
 function packageNameFromSpecifier(specifier) {
   if (specifier.startsWith(".") || specifier.startsWith("/")) return null;
   if (specifier.startsWith("node:")) return null;
@@ -512570,10 +512631,10 @@ function packageNameFromSpecifier(specifier) {
     const parts = specifier.split("/");
     if (parts[0] === "" || parts[1] === void 0 || parts[1] === "") return null;
     const name = `${parts[0]}/${parts[1]}`;
-    return NODE_BUILTINS.has(name) ? null : name;
+    return NODE_BUILTIN_MODULES.has(name) ? null : name;
   }
   const first = specifier.split("/")[0];
-  if (first === void 0 || first === "" || NODE_BUILTINS.has(first)) return null;
+  if (first === void 0 || first === "" || NODE_BUILTIN_MODULES.has(first)) return null;
   return first;
 }
 function collectLineRefs(refs, file, lineNumber, line) {
